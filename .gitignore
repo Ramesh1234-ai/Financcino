@@ -5,12 +5,16 @@ yarn.lock
 pnpm-lock.yaml
 
 # Environment variables
+# Never commit secret keys and credentials!
 .env
 .env.local
 .env.*.local
 .env.production.local
 .env.development.local
 .env.test.local
+.env.new                # Old/temporary env files
+.env.old
+.env.backup
 
 # IDE and Editor
 .vscode/
