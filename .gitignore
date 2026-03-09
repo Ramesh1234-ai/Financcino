@@ -108,3 +108,4 @@ BrokTok/.vite/
 *.db
 *.sqlite
 *.sqlite3
+.vercel
