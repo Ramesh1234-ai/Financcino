@@ -49,7 +49,6 @@ export function requireAuth(req, res, next) {
         logger.error('❌ [requireAuth] Token missing userId claim', { payload: JSON.stringify(payload).substring(0, 100) });
         return next(new AppError('Invalid token: missing user ID', 401));
       }
-
       // Attach user to request
       req.user = {
         id: userId,

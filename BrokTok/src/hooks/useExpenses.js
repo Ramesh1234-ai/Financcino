@@ -9,7 +9,6 @@ export default function useExpenses() {
 	const [stats, setStats] = useState({ totalSpent: 0, dailyAverage: 0, transactions: 0, savingsGoal: 0 })
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState(null)
-
 	const loadExpenses = useCallback(async () => {
 		if (!getToken) {
 			console.error('❌ useExpenses: getToken not available')
@@ -17,23 +16,19 @@ export default function useExpenses() {
 		}
 		setLoading(true)
 		setError(null)
-
 		try {
 			console.log('📍 [useExpenses.loadExpenses] Starting API call...')
 			const token = await getToken()
 			console.log('🔑 [useExpenses.loadExpenses] Got token?', !!token, 'length:', token?.length || 0)
-			
 			if (!token) {
 				console.error('❌ [useExpenses.loadExpenses] Token is null/undefined!')
 				setError('Not authenticated - please login')
 				setLoading(false)
 				return
 			}
-			
 			console.log('📤 [useExpenses.loadExpenses] Calling api.getExpenses with valid token...')
 			const res = await api.getExpenses(token)
 			console.log('📥 [useExpenses.loadExpenses] API response:', res)
-			
 			if (res?.error) {
 				setError(res.error)
 				setLoading(false)
@@ -89,12 +84,10 @@ export default function useExpenses() {
 			setLoading(false)
 		}
 	}, [getToken])
-
 	const addExpense = useCallback(async (payload) => {
 		if (!getToken) {
 			throw new Error('Authentication required')
 		}
-
 		try {
 			console.log('📍 [useExpenses.addExpense] Starting...')
 			const token = await getToken()  // ✅ Await token first
@@ -119,43 +112,49 @@ export default function useExpenses() {
 			throw err
 		}
 	}, [getToken, loadExpenses])
-
 	const updateExpenseItem = useCallback(async (id, payload) => {
 		if (!getToken) {
 			throw new Error('Authentication required')
 		}
-
 		try {
-			const res = await api.updateExpense(id, payload, getToken)
+			console.log('📍 [useExpenses.updateExpenseItem] Updating expense:', id)
+			const token = await getToken()  // ✅ Await token
+			if (!token) {
+				throw new Error('Failed to get authentication token')
+			}
+			
+			const res = await api.updateExpense(id, payload, token)
 			if (res?.error) {
 				throw new Error(res.error)
 			}
 			await loadExpenses()
 			return res?.data || res
 		} catch (err) {
-			console.error('updateExpenseItem error:', err)
+			console.error('❌ [useExpenses.updateExpenseItem] error:', err)
 			throw err
 		}
 	}, [getToken, loadExpenses])
-
 	const deleteExpenseItem = useCallback(async (id) => {
 		if (!getToken) {
 			throw new Error('Authentication required')
 		}
-
 		try {
-			const res = await api.deleteExpense(id, getToken)
+			console.log('📍 [useExpenses.deleteExpenseItem] Deleting expense:', id)
+			const token = await getToken()  // ✅ Await token
+			if (!token) {
+				throw new Error('Failed to get authentication token')
+			}
+			const res = await api.deleteExpense(id, token)
 			if (res?.error) {
 				throw new Error(res.error)
 			}
 			await loadExpenses()
 			return { ok: true }
 		} catch (err) {
-			console.error('deleteExpenseItem error:', err)
+			console.error('❌ [useExpenses.deleteExpenseItem] error:', err)
 			throw err
 		}
 	}, [getToken, loadExpenses])
-
 	return { 
 		transactions, 
 		categories, 

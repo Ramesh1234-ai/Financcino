@@ -231,7 +231,7 @@ const CategoryBreakdown = ({ categories }) => {
                 <div className="text-black-400 text-xs">{count} transactions</div>
               </div>
               <div className="text-emerald-400 text-sm font-semibold">
-                ${amount.toFixed(2)}
+                ₹{amount.toFixed(2)}
               </div>
             </div>
           )
@@ -372,12 +372,12 @@ const ExpenseTrackerDashboard = () => {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <StatsCard
               label="Total Spent"
-              value={`$${(expenses.stats?.totalSpent || 0).toFixed(2)}`}
+              value={`₹${(expenses.stats?.totalSpent || 0).toFixed(2)}`}
               isLoading={expenses.loading}
             />
             <StatsCard
               label="Daily Average"
-              value={`$${(expenses.stats?.dailyAverage || 0).toFixed(2)}`}
+              value={`₹${(expenses.stats?.dailyAverage || 0).toFixed(2)}`}
               isLoading={expenses.loading}
             />
             <StatsCard
@@ -387,7 +387,7 @@ const ExpenseTrackerDashboard = () => {
             />
             <StatsCard
               label="Savings Goal"
-              value={`$${(expenses.stats?.savingsGoal || 0).toFixed(2)}`}
+              value={`₹${(expenses.stats?.savingsGoal || 0).toFixed(2)}`}
               isLoading={expenses.loading}
             />
           </div>

@@ -244,7 +244,6 @@ function ReceiptGallery() {
           </button>
         </div>
       )}
-
       {/* Bulk Actions */}
       {selected.length > 0 && (
         <div className="flex items-center justify-between mb-4 bg-indigo-50 border border-indigo-100 px-4 py-3 rounded-lg">

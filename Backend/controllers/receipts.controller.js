@@ -176,7 +176,7 @@ export async function uploadReceipt(req, res, next) {
 		// Parse receipt data using Gemini
 		const extractedData = await parseReceiptWithGemini(text);
 
-		// Store receipt in database
+		// Store receipt in database with normalized data structure
 		const receipt = await Receipt.create({
 			userId,
 			fileName: file.originalname,
@@ -184,7 +184,15 @@ export async function uploadReceipt(req, res, next) {
 			mimeType: file.mimetype,
 			extractedData: {
 				text,
-				...extractedData
+				// Store both original and normalized field names for compatibility
+				amount: extractedData.amount,
+				total: extractedData.amount, // For backward compatibility
+				date: extractedData.date,
+				dates: [extractedData.date], // For backward compatibility
+				merchant: extractedData.merchant,
+				category: extractedData.category,
+				currency: extractedData.currency,
+				items: extractedData.items || []
 			},
 			isProcessed: false,
 			fileUrl: `/uploads/${file.filename || file.originalname}`
@@ -227,9 +235,16 @@ export async function uploadReceipt(req, res, next) {
 				});
 
 				// Mark receipt as processed
-				receipt.isProcessed = true;
+				receipt.isProcessed = true;				
 				await receipt.save();
 
+				logger.info('✅ [uploadReceipt] Expense and receipt fully processed:', {
+					expenseId: expense._id,
+					ceiptId: receipt._id,
+					amount: expense.amount,
+					category: category.name,
+					isProcessed: true
+				});
 				logger.info('✅ [uploadReceipt] Expense created:', {
 					expenseId: expense._id,
 					amount: expense.amount,
@@ -357,27 +372,46 @@ export async function getReceiptById(req, res, next) {
 	}
 }
 /**
- * Delete receipt
+ * Delete receipt and associated expense
  */
 export async function deleteReceipt(req, res, next) {
 	try {
 		const userId = req.user.id;
 		const { id } = req.params;
 
-		const receipt = await Receipt.findOneAndDelete({ _id: id, userId });
+		logger.debug('🗑️  [deleteReceipt] Deleting receipt:', { userId, receiptId: id });
 
+		const receipt = await Receipt.findOne({ _id: id, userId });
 		if (!receipt) {
+			logger.warn('⚠️  [deleteReceipt] Receipt not found:', { userId, receiptId: id });
 			throw new AppError('Receipt not found', 404);
 		}
 
-		logger.info('Receipt deleted', { userId, receiptId: id });
+		// Delete the receipt from database
+		await Receipt.deleteOne({ _id: id });
+		logger.info('✅ [deleteReceipt] Receipt deleted:', { userId, receiptId: id });
+
+		// Also delete any associated expenses (if notes contain receipt ID)
+		try {
+			const deleteResult = await Expense.deleteMany({
+				userId,
+				notes: { $regex: id }
+			});
+			if (deleteResult.deletedCount > 0) {
+				logger.info('✅ [deleteReceipt] Associated expenses deleted:', { count: deleteResult.deletedCount });
+			}
+		} catch (expenseErr) {
+			logger.warn('⚠️  [deleteReceipt] Failed to delete associated expenses:', expenseErr.message);
+			// Continue - receipt was already deleted
+		}
 
 		res.status(200).json({
 			success: true,
-			message: 'Receipt deleted successfully'
+			message: 'Receipt deleted successfully',
+			data: { deletedReceiptId: id }
 		});
 	} catch (error) {
-		logger.error('Delete receipt error:', error);
+		logger.error('❌ [deleteReceipt] Error:', error.message);
 		next(error);
 	}
 }
