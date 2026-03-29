@@ -10,40 +10,117 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
 
 /**
+ * Clean and normalize OCR text before parsing
+ */
+function cleanOCRText(text) {
+  if (!text) return '';
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .join('\n');
+}
+
+/**
  * Enhanced Gemini-based OCR parsing for receipts
  * Uses structured JSON extraction for reliable data
  */
 async function parseReceiptWithGemini(ocrText) {
   try {
+    // Validate OCR text
+    if (!ocrText || ocrText.trim().length === 0) {
+      logger.warn('⚠️  [parseReceiptWithGemini] Empty OCR text received');
+      return parseReceiptBasic(ocrText);
+    }
+
+    // Clean OCR text before sending to Gemini
+    const cleanedText = cleanOCRText(ocrText);
+    logger.info('📝 [parseReceiptWithGemini] OCR text cleaned, length:', cleanedText.length);
+
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `You are a receipt parser. Extract EXACTLY these fields from the receipt OCR text below.
-Return a JSON object (no markdown, no code blocks, just plain JSON).
+    const prompt = `You are a STRICT financial extraction system with ZERO tolerance for guessing.
+
+Extract receipt data from OCR text with EXTREME CAUTION.
+
+Return ONLY valid JSON in this format (NO explanations, NO comments):
+{
+  "amount": number | null,
+  "amount_line": string | null,
+  "merchant": string | null,
+  "date": string | null,
+  "category": string | null,
+  "confidence": "high" | "low"
+}
+
+⚠️ CRITICAL - READ CAREFULLY:
+
+1. AMOUNT EXTRACTION (MOST CRITICAL):
+   - ONLY extract if you find a line containing BOTH:
+     (a) explicit keyword: "Total", "Grand Total", "Amount Paid", "Net Amount", "Amount Due"
+     (b) followed by a number (not in a list of items)
+   
+   - REJECT if:
+     * No clear "Total" keyword found
+     * Could be item price instead of total
+     * Confidence is below 95%
+   
+   - SPECIAL RULE FOR ZERO:
+     * 0 is ONLY valid if line reads exactly like "Total: 0" or "Amount Paid: 0"
+     * If amount is 0 but no explicit "Total" keyword → REJECT and return null
+     * When in doubt about 0 → return null (IMPORTANT)
+   
+   - When you extract amount:
+     * Return the EXACT line containing the amount
+     * Include the keyword and number in amount_line
+     * Example: amount_line: "Total Amount: ₹450.50"
+
+2. NO HALLUCINATION:
+   - Never invent numbers
+   - Never guess amounts
+   - Never use item prices
+   - Never use tax amounts
+   - Never use subtotals without "Total" keyword
+   - If unsure → return null, not a guess
+
+3. MERCHANT:
+   - Extract if first line is clearly readable
+   - Return null if noisy/corrupted
+   
+4. DATE:
+   - Convert to YYYY-MM-DD only if parseable
+   - Return null otherwise
+
+5. CATEGORY:
+   - Only assign if obvious: Food, Grocery, Travel, Shopping
+   - Otherwise return "Other"
+
+6. CONFIDENCE:
+   - Return "high" only if all data extracted with certainty
+   - Return "low" if uncertain about any field
+   - (This helps identify potential hallucinations)
+
+7. OUTPUT:
+   - ONLY JSON
+   - NO explanations before or after
+   - NO code blocks
+   - NO comments
+
 OCR TEXT:
 ---
-${ocrText}
+${cleanedText}
 ---
-JSON FORMAT:
-{
-  "amount": <positive number (NOT string)>,
-  "currency": "<3-letter code like USD or INR>",
-  "date": "<YYYY-MM-DD>",
-  "merchant": "<store or restaurant name>",
-  "category": "<Food|Transport|Shopping|Entertainment|Utilities|Health|Education|Other>",
-  "items": [{"name": "<item>", "price": <number>}]
-}
-CRITICAL RULES:
-1. amount: MUST be a valid number. Look for: Total, Grand Total, Amount Due, Subtotal + Tax
-2. DO NOT include tax, tip, or delivery separately - extract THE TOTAL ONLY
-3. If amount has multiple values, pick the largest one (usually the final total)
-4. Ensure amount > 0 and is realistic (e.g., 15.99, not 1599)
-5. date: Extract from receipt. Use today if missing. Must be YYYY-MM-DD format
-6. merchant: Store name, restaurant name, or vendor name
-7. category: Choose ONE from the list based on merchant/items
-8. items: Try to list purchased items with prices if visible
-9. If a field is not found, use null but ALWAYS include all keys
-10. Return ONLY valid JSON - no explanations, no markdown`;
+
+Return ONLY the JSON object, nothing else.`;
+
     const result = await model.generateContent(prompt);
+    
+    if (!result.response.text()) {
+      logger.error('❌ [parseReceiptWithGemini] Empty response from Gemini');
+      return parseReceiptBasic(ocrText);
+    }
+
     const responseText = result.response.text().trim();
+    logger.info('📬 [parseReceiptWithGemini] Gemini response received, length:', responseText.length);
     
     // Remove markdown code blocks if present
     let jsonStr = responseText;
@@ -55,91 +132,242 @@ CRITICAL RULES:
     
     const parsed = JSON.parse(jsonStr);
     
-    // Validate extracted data
-    if (!parsed.amount || typeof parsed.amount !== 'number' || parsed.amount <= 0) {
-      logger.warn('⚠️  [parseReceiptWithGemini] Invalid amount:', parsed.amount);
-      throw new Error('Invalid amount extracted from receipt');
+    logger.info('✅ [parseReceiptWithGemini] Parsed response:', {
+      amount: parsed.amount,
+      amount_line: parsed.amount_line,
+      confidence: parsed.confidence,
+      merchant: parsed.merchant,
+      date: parsed.date,
+      category: parsed.category
+    });
+    
+    // CRITICAL: Validate amount extraction to prevent hallucinations
+    if (parsed.amount === null || parsed.amount === undefined) {
+      logger.warn('⚠️  [parseReceiptWithGemini] No valid amount found by Gemini - trying fallback');
+      const fallback = parseReceiptBasic(ocrText);
+      parsed.amount = fallback.amount;
+      parsed.amount_line = fallback.amount_line;
+    } else if (typeof parsed.amount !== 'number' || parsed.amount < 0) {
+      logger.warn('⚠️  [parseReceiptWithGemini] Invalid amount from Gemini:', parsed.amount);
+      const fallback = parseReceiptBasic(ocrText);
+      parsed.amount = fallback.amount;
+      parsed.amount_line = fallback.amount_line;
+    } else if (parsed.amount === 0) {
+      // SPECIAL VALIDATION: 0 is only valid if explicitly shown in amount_line
+      const hasExplicitZero = parsed.amount_line && 
+                              /\b(?:total|grand\s*total|amount\s*(?:paid|due)|net\s*amount)[\s:]*0\b/i.test(parsed.amount_line);
+      
+      if (!hasExplicitZero) {
+        logger.warn('⚠️  [parseReceiptWithGemini] Amount is 0 but not explicitly labeled as Total - REJECTING as hallucination');
+        logger.info('Amount line provided:', parsed.amount_line);
+        const fallback = parseReceiptBasic(ocrText);
+        parsed.amount = fallback.amount;
+        parsed.amount_line = fallback.amount_line;
+      } else {
+        logger.info('✅ [parseReceiptWithGemini] Amount is 0 but explicitly labeled as total - ACCEPTING');
+      }
+    } else if (parsed.confidence === 'low') {
+      logger.warn('⚠️  [parseReceiptWithGemini] Confidence marked as LOW - using fallback for safety');
+      const fallback = parseReceiptBasic(ocrText);
+      parsed.amount = fallback.amount || parsed.amount;
+      parsed.amount_line = fallback.amount_line || parsed.amount_line;
     }
     
-    // Ensure category is valid
-    const validCategories = ['Food', 'Transport', 'Shopping', 'Entertainment', 'Utilities', 'Health', 'Education', 'Other'];
-    if (!validCategories.includes(parsed.category)) {
+    // Validate category (use fallback if not provided)
+    const validCategories = ['Food', 'Grocery', 'Travel', 'Shopping', 'Other'];
+    if (!parsed.category || !validCategories.includes(parsed.category)) {
       parsed.category = 'Other';
     }
     
-    // Ensure date is valid
-    if (!parsed.date || isNaN(new Date(parsed.date).getTime())) {
-      parsed.date = new Date().toISOString().split('T')[0];
+    // Keep date as null if not extracted (don't fill with today's date)
+    if (parsed.date && isNaN(new Date(parsed.date).getTime())) {
+      logger.warn('⚠️  [parseReceiptWithGemini] Invalid date format:', parsed.date);
+      parsed.date = null;
+    }
+    
+    // Merchant can be null - that's ok
+    if (parsed.merchant && typeof parsed.merchant !== 'string') {
+      parsed.merchant = null;
+    }
+    
+    // amount_line must be string or null
+    if (parsed.amount_line && typeof parsed.amount_line !== 'string') {
+      parsed.amount_line = null;
     }
     
     logger.info('✅ [parseReceiptWithGemini] Successfully parsed receipt:', {
       amount: parsed.amount,
-      currency: parsed.currency,
+      amount_line: parsed.amount_line,
       category: parsed.category,
       date: parsed.date,
       merchant: parsed.merchant
     });
     
-    return parsed;
+    return {
+      amount: parsed.amount,
+      amount_line: parsed.amount_line || null,
+      merchant: parsed.merchant || null,
+      date: parsed.date || null,
+      category: parsed.category || 'Other',
+      currency: 'INR', // Default currency for India
+      items: [] // Simplified structure
+    };
   } catch (err) {
-    logger.error('❌ [parseReceiptWithGemini] Gemini parsing failed:', err.message);
+    logger.error('❌ [parseReceiptWithGemini] Gemini parsing failed:', {
+      error: err.message,
+      errorType: err.constructor.name,
+      stack: err.stack
+    });
     // Fallback to basic regex parsing
     return parseReceiptBasic(ocrText);
   }
 }
 
 /**
- * Fallback basic regex-based parsing
+ * Fallback basic regex-based parsing with improved patterns
  */
 function parseReceiptBasic(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-  
-  // Extract amount - look for currency symbols or amount patterns
-  let amount = null;
-  const amountPattern = /(?:total|amount|sum|due|balance)[\s:]*\$?(\d+(?:\.\d{2})?)/i;
-  
-  for (const line of lines) {
-    const match = line.match(amountPattern);
-    if (match) {
-      amount = parseFloat(match[1]);
-      break;
-    }
-    // Fallback: look for any monetary value at end of line
-    const dollarMatch = line.match(/\$(\d+(?:\.\d{2})?)/);
-    if (dollarMatch && parseFloat(dollarMatch[1]) > 0) {
-      amount = parseFloat(dollarMatch[1]);
-    }
+  if (!text) {
+    logger.warn('⚠️  [parseReceiptBasic] Empty text provided');
+    return {
+      amount: null,
+      amount_line: null,
+      merchant: null,
+      date: null,
+      category: 'Other',
+      currency: 'INR',
+      items: []
+    };
   }
 
-  // Extract date
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l && l.length > 1);
+  
+  logger.info('📋 [parseReceiptBasic] Processing', lines.length, 'lines');
+
+  // Extract amount - look for currency symbols or amount patterns
+  let amount = null;
+  let amount_line = null;
+  const amountPatterns = [
+    // Common patterns with keywords - MUST have explicit total keyword
+    /(?:total|grand\s*total|amount\s*(?:due|paid)?|final|balance|subtotal|net|sum)[\s:]*[₹$€£¥]*\s*(\d{1,6}(?:[.,]\d{2})?)/i,
+    // Lines ending with currency and number
+    /[₹$€£¥]\s*(\d{1,6}(?:[.,]\d{2})?)/,
+    // Large numbers (potential totals)
+    /(\d{2,6}(?:[.,]\d{2})?)\s*(?:only|rupees?|dollars?|inr|usd)?$/i,
+  ];
+
+  for (const pattern of amountPatterns) {
+    for (const line of lines) {
+      const match = line.match(pattern);
+      if (match) {
+        let parsed = match[1].replace(/[,]/g, '');
+        parsed = parseFloat(parsed);
+        
+        // Validate amount
+        if (parsed === 0) {
+          // 0 is ONLY valid if explicitly labeled with total keyword
+          const hasExplicitZero = /\b(?:total|grand\s*total|amount\s*(?:due|paid)|net|final)\b.*\b0\b/i.test(line);
+          if (hasExplicitZero) {
+            amount = 0;
+            amount_line = line;
+            logger.info('✅ [parseReceiptBasic] Found explicit zero amount from line:', line);
+            break;
+          }
+          // Otherwise skip this 0
+        } else if (parsed > 0 && parsed < 999999) {
+          amount = parsed;
+          amount_line = line;
+          logger.info('✅ [parseReceiptBasic] Found amount:', amount, 'from line:', line);
+          break;
+        }
+      }
+    }
+    if (amount !== null) break; // Change to !== null to allow 0
+  }
+
+  // Extract date - multiple formats
   let date = null;
-  const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/;
+  const datePatterns = [
+    // DD/MM/YYYY or DD-MM-YYYY
+    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/,
+    // YYYY-MM-DD
+    /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/,
+    // DD MM YYYY
+    /(\d{1,2})\s+(\d{1,2})\s+(\d{4})/,
+  ];
+
+  for (const pattern of datePatterns) {
+    for (const line of lines) {
+      const match = line.match(pattern);
+      if (match) {
+        let day = parseInt(match[1]);
+        let month = parseInt(match[2]);
+        let year = parseInt(match[3]);
+
+        // Detect format: if first number > 31, it's year-first format
+        if (day > 31) {
+          [day, month, year] = [month, parseInt(match[3]), day];
+        }
+
+        // Validate
+        if (day > 31 || month > 12 || month < 1 || day < 1) continue;
+        if (year < 100) year = year < 50 ? 2000 + year : 1900 + year;
+
+        const dateObj = new Date(year, month - 1, day);
+        if (!isNaN(dateObj.getTime())) {
+          date = dateObj.toISOString().split('T')[0];
+          logger.info('✅ [parseReceiptBasic] Found date:', date, 'from line:', line);
+          break;
+        }
+      }
+    }
+    if (date) break;
+  }
+
+  // Extract merchant - usually first meaningful non-numeric line
+  let merchant = null;
   for (const line of lines) {
-    const match = line.match(datePattern);
-    if (match) {
-      date = match[1];
-      break;
+    if (line.length > 2 && line.length < 100 && !line.match(/^\d+/) && !line.match(/total|amount|date/i)) {
+      merchant = line
+        .replace(/[^\w\s\-&.]/g, '') // Remove special chars
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (merchant && merchant.length > 2) {
+        logger.info('✅ [parseReceiptBasic] Found merchant:', merchant);
+        break;
+      }
     }
   }
 
   // Guess category from keywords
   const textLower = text.toLowerCase();
   let category = 'Other';
-  if (textLower.includes('restaurant') || textLower.includes('cafe') || textLower.includes('food')) {
-    category = 'Food';
-  } else if (textLower.includes('gas') || textLower.includes('fuel') || textLower.includes('uber') || textLower.includes('taxi')) {
-    category = 'Transport';
-  } else if (textLower.includes('store') || textLower.includes('shop') || textLower.includes('mall')) {
-    category = 'Shopping';
+  
+  // Map to simplified categories from strict extraction
+  const categoryMap = {
+    'Food': ['restaurant', 'cafe', 'food', 'pizza', 'burger', 'hotel', 'bistro', 'diner', 'dining', 'swiggy', 'zomato', 'ubereats', 'grab'],
+    'Grocery': ['store', 'shop', 'supermarket', 'mart', 'grocery', 'market'],
+    'Travel': ['taxi', 'uber', 'ola', 'car', 'fuel', 'petrol', 'gas', 'parking', 'metro', 'train', 'bus', 'flight', 'auto'],
+    'Shopping': ['mall', 'retail', 'amazon', 'flipkart', 'clothing', 'apparel', 'boutique'],
+    'Other': ['other']
+  };
+
+  for (const [cat, keywords] of Object.entries(categoryMap)) {
+    if (keywords.some(kw => textLower.includes(kw))) {
+      category = cat;
+      logger.info('✅ [parseReceiptBasic] Detected category:', category);
+      break;
+    }
   }
 
   return {
     amount: amount || null,
-    currency: 'USD',
-    date: date || new Date().toISOString().split('T')[0],
-    merchant: null,
-    items: [],
-    category,
+    amount_line: amount_line || null,
+    merchant: merchant || null,
+    date: date || null, // Don't fill with today's date - respect null from strict extraction
+    category: category,
+    currency: 'INR', // Default currency for India
+    items: []
   };
 }
 
@@ -171,10 +399,32 @@ export async function uploadReceipt(req, res, next) {
 		const { data: { text } } = await worker.recognize(file.buffer);
 		await worker.terminate();
 
-		logger.info('📝 [uploadReceipt] OCR complete, text length:', text.length);
+		const ocrText = text.trim();
+		logger.info('📝 [uploadReceipt] OCR complete', {
+			textLength: ocrText.length,
+			textPreview: ocrText.substring(0, 200),
+			isEmpty: ocrText.length === 0
+		});
+
+		// Validate OCR output
+		if (ocrText.length === 0) {
+			logger.warn('⚠️  [uploadReceipt] OCR returned empty text - file may not be a valid receipt image');
+			return res.status(400).json({
+				success: false,
+				message: 'Could not extract text from image. Please ensure image is clear and contains a receipt.'
+			});
+		}
 
 		// Parse receipt data using Gemini
-		const extractedData = await parseReceiptWithGemini(text);
+		const extractedData = await parseReceiptWithGemini(ocrText);
+
+		logger.info('🔎 [uploadReceipt] Final extracted data:', {
+			amount: extractedData.amount,
+			amount_line: extractedData.amount_line,
+			merchant: extractedData.merchant,
+			date: extractedData.date,
+			category: extractedData.category
+		});
 
 		// Store receipt in database with normalized data structure
 		const receipt = await Receipt.create({
@@ -183,9 +433,10 @@ export async function uploadReceipt(req, res, next) {
 			fileSize: file.size,
 			mimeType: file.mimetype,
 			extractedData: {
-				text,
+				text: ocrText,
 				// Store both original and normalized field names for compatibility
 				amount: extractedData.amount,
+				amount_line: extractedData.amount_line, // For verification and debugging
 				total: extractedData.amount, // For backward compatibility
 				date: extractedData.date,
 				dates: [extractedData.date], // For backward compatibility
@@ -200,7 +451,7 @@ export async function uploadReceipt(req, res, next) {
 
 		logger.info('✅ [uploadReceipt] Receipt saved:', receipt._id);
 
-		// Automatically create expense if amount is valid
+		// Automatically create expense if amount is valid (must be > 0)
 		if (extractedData.amount && extractedData.amount > 0) {
 			try {
 				logger.info('💾 [uploadReceipt] Creating expense from receipt...');
@@ -289,6 +540,16 @@ export async function uploadReceipt(req, res, next) {
 			}
 		}
 
+		// If we reach here, amount was null or 0
+		if (extractedData.amount === null) {
+			logger.warn('⚠️  [uploadReceipt] Amount could not be extracted - neither Gemini nor fallback found valid total');
+			logger.info('💡 [uploadReceipt] Check amount_line in extracted data:', extractedData.amount_line);
+		} else if (extractedData.amount === 0) {
+			logger.warn('⚠️  [uploadReceipt] Amount is 0 - either hallucination detected or actual free item');
+			logger.info('📝 [uploadReceipt] Amount line:', extractedData.amount_line);
+			logger.info('🔍 [uploadReceipt] Review OCR text to verify if receipt is actually $0');
+		}
+
 		res.status(201).json({
 			success: true,
 			data: {
@@ -297,7 +558,7 @@ export async function uploadReceipt(req, res, next) {
 					fileName: receipt.fileName,
 					uploadedAt: receipt.createdAt,
 					extractedData: receipt.extractedData,
-					message: 'Receipt uploaded and processed'
+					message: extractedData.amount ? 'Receipt uploaded and processed' : 'Receipt uploaded but amount could not be extracted'
 				}
 			}
 		});

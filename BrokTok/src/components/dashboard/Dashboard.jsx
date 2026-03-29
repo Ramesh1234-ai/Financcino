@@ -129,19 +129,27 @@ const UploadReceiptCard = ({ onUpload }) => {
   const handleUpload = async (file) => {
     setUploadStatus('processing');
     try {
-      const token = await getToken()
-      const res = await api.uploadReceipt(file, token)
+      console.log('📸 [Dashboard] Starting upload:', file.name);
+      const token = await getToken();
+      if (!token) throw new Error('No auth token');
+      
+      console.log('📸 [Dashboard] Got token, uploading');
+      const res = await api.uploadReceipt(file, token);
+      console.log('📸 [Dashboard] Upload response:', res);
+      
       if (res?.error) {
-        throw new Error(res.error || 'Upload API failed')
+        throw new Error(res.error || 'Upload API failed');
       }
 
-      setUploadStatus('success')
-      onUpload()
-      setTimeout(() => setUploadStatus(null), 2000)
+      setUploadStatus('success');
+      setTimeout(() => {
+        onUpload();
+        setUploadStatus(null);
+      }, 1500);
     } catch (error) {
-      console.error('Upload error:', error)
-      setUploadStatus(null)
-      alert(`Upload failed. ${error.message || 'Please try again.'}`)
+      console.error('❌ [Dashboard] Upload error:', error);
+      setUploadStatus(null);
+      alert(`Upload failed: ${error.message || 'Please try again.'}`);
     }
   };
 

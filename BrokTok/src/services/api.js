@@ -149,69 +149,156 @@ export async function getAnalytics(range = 'month', token) {
 }
 
 // ==================== RECEIPT API ====================
+
+/**
+ * Compress image before upload to reduce transfer time
+ * @param {File} file - Image file
+ * @param {number} maxWidth - Max width in pixels
+ * @param {number} quality - Quality 0-1
+ * @returns {Promise<Blob>}
+ */
+async function compressImage(file, maxWidth = 1200, quality = 0.8) {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.readAsDataURL(file);
+		reader.onload = (event) => {
+			const img = new Image();
+			img.src = event.target.result;
+			img.onload = () => {
+				const canvas = document.createElement('canvas');
+				let width = img.width;
+				let height = img.height;
+
+				// Scale down if width exceeds maxWidth
+				if (width > maxWidth) {
+					height = (height * maxWidth) / width;
+					width = maxWidth;
+				}
+
+				canvas.width = width;
+				canvas.height = height;
+				const ctx = canvas.getContext('2d');
+				ctx.drawImage(img, 0, 0, width, height);
+
+				canvas.toBlob(
+					(blob) => {
+						console.log(`📦 [compressImage] Compressed ${(file.size / 1024).toFixed(2)}KB ➜ ${(blob.size / 1024).toFixed(2)}KB`);
+						resolve(blob);
+					},
+					'image/jpeg',
+					quality
+				);
+			};
+			img.onerror = reject;
+		};
+		reader.onerror = reject;
+	});
+}
+
 export async function uploadReceipt(file, token) {
 	if (!BASE) {
-		return { error: 'no-backend' }
+		return { error: 'no-backend' };
 	}
 
-	const url = BASE.replace(/\/$/, '') + '/receipts/upload'
-	const form = new FormData()
-	form.append('receipt', file)
+	console.log('📸 [uploadReceipt] Starting upload:', {
+		fileName: file.name,
+		fileSize: (file.size / 1024).toFixed(2) + 'KB',
+		fileType: file.type
+	});
+
+	const url = BASE.replace(/\/$/, '') + '/receipts/upload';
 
 	try {
-		// Resolve token if it's a function
-		let authToken = null
+		// Step 1: Resolve token
+		let authToken = null;
 		if (typeof token === 'function') {
 			try {
-				authToken = await token()
+				authToken = await token();
 				if (!authToken) {
-					console.warn('❌ [uploadReceipt] getToken() returned null')
-					return { success: false, error: 'Failed to get auth token' }
+					console.warn('❌ [uploadReceipt] getToken() returned null');
+					return { success: false, error: 'Failed to get auth token' };
 				}
 			} catch (err) {
-				console.warn('❌ [uploadReceipt] Failed to get token:', err.message)
-				return { success: false, error: 'Failed to get auth token' }
+				console.warn('❌ [uploadReceipt] Failed to get token:', err.message);
+				return { success: false, error: 'Failed to get auth token' };
 			}
 		} else if (typeof token === 'string') {
-			authToken = token
+			authToken = token;
 		}
-
-		const headers = {}
+		console.log('✅ [uploadReceipt] Token resolved');
+		// Step 2: Compress image if it's too large
+		let uploadFile = file;
+		if (file.size > 2 * 1024 * 1024) {
+			console.log('📦 [uploadReceipt] File too large, compressing...');
+			const compressedBlob = await compressImage(file, 1200, 0.75);
+			uploadFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+			console.log('📦 [uploadReceipt] Compression complete');
+		}
+		// Step 3: Create form data
+		const form = new FormData();
+		form.append('receipt', uploadFile);
+		// Step 4: Prepare headers
+		const headers = {};
 		if (authToken) {
-			headers['Authorization'] = `Bearer ${authToken}`
-			console.log('🔐 [uploadReceipt] Authorization header set ✓')
+			headers['Authorization'] = `Bearer ${authToken}`;
+			console.log('🔐 [uploadReceipt] Authorization header set');
 		} else {
-			console.warn('⚠️  [uploadReceipt] NO Authorization header - request will fail')
+			console.warn('⚠️  [uploadReceipt] NO Authorization header');
 		}
 
-		// Don't set Content-Type for FormData - browser will set it with boundary
-		const controller = new AbortController()
-		const timeoutId = setTimeout(() => controller.abort(), 30000)
-
+		// Step 5: Send request with extended timeout
+		// OCR + Gemini can take up to 30 seconds, so we allow 60 seconds total
+		const controller = new AbortController();
+		const timeoutMs = 60000; // 60 seconds for OCR processing
+		const timeoutId = setTimeout(() => {
+			console.error(`⏱️  [uploadReceipt] Request timeout after ${timeoutMs / 1000}s`);
+			controller.abort();
+		}, timeoutMs);
+		console.log(`⏱️  [uploadReceipt] Sending request (timeout: ${timeoutMs / 1000}s)...`);
+		const startTime = Date.now();
 		const res = await fetch(url, {
 			method: 'POST',
 			headers,
 			body: form,
 			signal: controller.signal
-		})
+		});
+		const elapsed = Date.now() - startTime;
+		clearTimeout(timeoutId);
+		console.log(`✅ [uploadReceipt] Response received after ${elapsed}ms`, {
+			status: res.status,
+			statusText: res.statusText
+		});
 
-		clearTimeout(timeoutId)
-
+		// Step 6: Parse response
 		if (!res.ok) {
-			const text = await res.text()
-			console.error('❌ [uploadReceipt] Error:', res.status, text)
-			return { success: false, error: text || res.statusText, statusCode: res.status }
+			const text = await res.text();
+			console.error('❌ [uploadReceipt] Server error:', res.status, text);
+			return {
+				success: false,
+				error: text || res.statusText,
+				statusCode: res.status
+			};
 		}
 
-		const data = await res.json()
-		console.log('✅ [uploadReceipt] Success:', data)
-		return { success: true, ...data }
+		const data = await res.json();
+		console.log('✅ [uploadReceipt] Success:', {
+			receiptId: data.data?.receipt?.id,
+			expenseId: data.data?.expense?.id,
+			amount: data.data?.expense?.amount,
+			duration: elapsed + 'ms'
+		});
+		return { success: true, ...data };
 	} catch (err) {
 		if (err.name === 'AbortError') {
-			console.error('❌ [uploadReceipt] Request timeout')
-			return { success: false, error: 'Request timeout' }
+			console.error('❌ [uploadReceipt] Request timeout - OCR processing took too long');
+			return {
+				success: false,
+				error: 'Request timeout (OCR processing taking too long)',
+				code: 'TIMEOUT'
+			};
 		}
-		console.error('❌ [uploadReceipt] Network error:', err.message)
+
+		console.error('❌ [uploadReceipt] Network error:', err.message);
 		return { success: false, error: err.message }
 	}
 }
@@ -231,7 +318,6 @@ export async function deleteReceipt(id, token) {
 		method: 'DELETE',
 	}, token)
 }
-
 // ==================== CATEGORY API ====================
 export async function getCategories(token) {
 	console.log('📂 [getCategories] Fetching categories with token:', token ? '✓' : '✗')
@@ -241,7 +327,6 @@ export async function getCategories(token) {
 	console.log('📂 [getCategories] Response:', res)
 	return res
 }
-
 // ==================== CHAT API ====================
 export async function sendChatMessage(message, token) {
 	console.log('💬 [sendChatMessage] Sending message with token:', token ? '✓' : '✗')
@@ -252,7 +337,6 @@ export async function sendChatMessage(message, token) {
 	console.log('💬 [sendChatMessage] Response:', res)
 	return res
 }
-
 export async function createCategory(payload, token) {
 	console.log('📂 [createCategory] Creating category with token:', token ? '✓' : '✗')
 	return callApi('/categories', {
@@ -268,12 +352,10 @@ export async function updateCategory(id, payload, token) {
 		body: JSON.stringify(payload),
 	}, token)
 }
-
 export async function deleteCategory(id, token) {
 	console.log('📂 [deleteCategory] Deleting category:', id)
 	return callApi(`/categories/${id}`, {
 		method: 'DELETE',
 	}, token)
 }
-
 export default { getExpenses, createExpense, updateExpense, deleteExpense, getAnalytics, getCategories, sendChatMessage, uploadReceipt, getReceipts, deleteReceipt }

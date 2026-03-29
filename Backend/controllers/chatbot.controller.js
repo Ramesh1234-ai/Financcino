@@ -45,18 +45,14 @@ export async function sendMessage(req, res, next) {
 			const prompt = `You are a helpful personal finance assistant. You help users track expenses, understand their spending, and provide budgeting advice.
 
 User's recent expenses:${expenseContext || ' None'}
-
 User message: "${trimmedMessage}"
-
 Provide a helpful, concise response (2-3 sentences max). Focus on practical advice related to:
 - Expense tracking
 - Spending patterns
 - Budget management
 - Saving tips
 - Category organization
-
 If the user asks something unrelated to finances, politely redirect them to financial topics.`;
-			
 			const result = await model.generateContent(prompt);
 			response = result.response.text().trim();
 			logger.info('✅ [sendMessage] Gemini response generated', { responseLength: response.length });
