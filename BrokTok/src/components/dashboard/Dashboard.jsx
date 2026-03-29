@@ -3,11 +3,10 @@ import useExpenses from '../../hooks/useExpenses'
 import useAuth from '../../hooks/useAuth'
 import Sidebar from '../common/Sidebar';
 import ChatbotWidget from '../chatbot/Chatbotwidget';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import * as api from '../../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import ManualExpenseForm from '../expenses/ManualExpenseForm';
-
 // Header Component
 const Header = ({ userName, onAddExpense }) => {
   const [greeting, setGreeting] = useState('Good morning');
@@ -51,7 +50,7 @@ const StatsCard = ({ label, value, isLoading }) => {
       <div className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
         {label}
       </div>
-      <div className="text-white text-2xl font-bold">{value}</div>
+      <div className="text-black text-2xl font-bold">{value}</div>
     </div>
   );
 };
@@ -129,36 +128,20 @@ const UploadReceiptCard = ({ onUpload }) => {
 
   const handleUpload = async (file) => {
     setUploadStatus('processing');
-    
-    // Call backend API to upload receipt
     try {
       const token = await getToken()
-      const formData = new FormData();
-      formData.append('receipt', file);
-      
-      const base = import.meta.env.VITE_API_URL || '';
-      const url = (base.replace(/\/$/, '') || '') + '/receipts/upload';
-      
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: token ? `Bearer ${token}` : '' },
-        body: formData,
-      });
-      
-      if (!res.ok) {
-        throw new Error(`Upload failed: ${res.status}`);
+      const res = await api.uploadReceipt(file, token)
+      if (res?.error) {
+        throw new Error(res.error || 'Upload API failed')
       }
-      
-      const data = await res.json();
-      
-      setUploadStatus('success');
-      // Notify parent that upload succeeded
-      onUpload();
-      setTimeout(() => setUploadStatus(null), 2000);
+
+      setUploadStatus('success')
+      onUpload()
+      setTimeout(() => setUploadStatus(null), 2000)
     } catch (error) {
-      console.error('Upload error:', error);
-      setUploadStatus(null);
-      alert('Upload failed. Please try again.');
+      console.error('Upload error:', error)
+      setUploadStatus(null)
+      alert(`Upload failed. ${error.message || 'Please try again.'}`)
     }
   };
 
@@ -245,7 +228,7 @@ const CategoryBreakdown = ({ categories }) => {
             >
               <div>
                 <div className="text-white text-sm font-medium">{name}</div>
-                <div className="text-gray-400 text-xs">{count} transactions</div>
+                <div className="text-black-400 text-xs">{count} transactions</div>
               </div>
               <div className="text-emerald-400 text-sm font-semibold">
                 ${amount.toFixed(2)}
@@ -263,7 +246,7 @@ const RecentTransactions = ({ transactions, isLoading }) => {
   if (isLoading) {
     return (
       <div className="bg-white/5 border border-white/10 p-5 rounded-xl backdrop-blur-md transition-all duration-300 hover:bg-white/8 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl shadow-lg">
-        <h2 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
+        <h2 className="text-black text-lg font-semibold mb-4 flex items-center gap-2">
           <span>📋</span>
           Recent Transactions
         </h2>
@@ -282,7 +265,7 @@ const RecentTransactions = ({ transactions, isLoading }) => {
   if (!transactions || transactions.length === 0) {
     return (
       <div className="bg-white/5 border border-white/10 p-5 rounded-xl backdrop-blur-md transition-all duration-300 hover:bg-white/8 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl shadow-lg">
-        <h2 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
+        <h2 className="text-black text-lg font-semibold mb-4 flex items-center gap-2">
           <span>📋</span>
           Recent Transactions
         </h2>
@@ -385,7 +368,6 @@ const ExpenseTrackerDashboard = () => {
       >
         <div className="max-w-7xl mx-auto">
           <Header userName={currentUser} onAddExpense={fetchData} />
-
           {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <StatsCard

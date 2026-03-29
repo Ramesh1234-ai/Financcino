@@ -4,6 +4,7 @@ import useAuth from '../../hooks/useAuth';
 import useExpenses from '../../hooks/useExpenses';
 import Sidebar from '../common/Sidebar';
 import { useNavigate } from "react-router-dom";
+import * as api from '../../services/api';
 import CreateExpenseFromReceiptModal from './CreateExpenseFromReceiptModal';
 
 function ReceiptGallery() {
@@ -27,23 +28,12 @@ function ReceiptGallery() {
 
     try {
       const token = await getToken()
-      // call backend via VITE_API_URL
-      const base = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-      const url = `${base.replace(/\/$/, '')}/receipts?page=${page}`
-      const res = await fetch(url, { 
-        headers: { 
-          Authorization: token ? `Bearer ${token}` : '' 
-        } 
-      })
-      
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`)
+      const response = await api.getReceipts(page, token)
+      if (response?.error) {
+        throw new Error(response.error)
       }
-      
-      const response = await res.json()
-      
-      // Backend returns { success: true, data: [...], pagination: {...} }
-      const rows = response.data || [];
+
+      const rows = response?.data || [];
       const normalized = rows.map(r => ({
         id: r.id,
         image: r.fileUrl || r.image || r.file_url || (`/uploads/${r.savedFileName || r.file_name || ''}`),
@@ -69,27 +59,31 @@ function ReceiptGallery() {
     );
   };
 
-  const deleteSelected = () => {
+  const deleteSelected = async () => {
     // delete receipts on backend then remove locally
     if (selected.length === 0) return
-    const base = import.meta.env.VITE_API_URL || '/api'
-    Promise.all(selected.map(id =>
-      fetch(`${base.replace(/\/$/, '')}/receipts/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: token ? `Bearer ${token}` : '' }
-      })
-    )).then(async (results) => {
-      // remove successfully deleted ids from UI
-      setReceipts((prev) => prev.filter((r) => !selected.includes(r.id)))
-      setSelected([])
-    }).catch(err => {
+
+    try {
+      const token = await getToken()  // ✅ Get fresh token for each operation
+      const deleteResults = await Promise.all(selected.map(async (id) => {
+        const res = await api.deleteReceipt(id, token)
+        return { id, ok: !res?.error }
+      }))
+
+      const successCount = deleteResults.filter(r => r.ok).length
+      if (successCount === selected.length) {
+        setReceipts((prev) => prev.filter((r) => !selected.includes(r.id)))
+        setSelected([])
+      } else {
+        alert(`Failed to delete ${selected.length - successCount} receipts`)    
+      }
+    } catch (err) {
       console.error('Failed to delete receipts', err)
       alert('Failed to delete some receipts')
-    })
+    }
   };
 
   // Upload handling - now only via drag-drop in Dashboard
-  const [createPayload, setCreatePayload] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedReceiptForExpense, setSelectedReceiptForExpense] = useState(null);
 
@@ -224,7 +218,7 @@ function ReceiptGallery() {
             </h3>
             <p className="text-gray-500">{preview.date}</p>
             <p className="text-indigo-600 font-semibold mt-2">
-              ${preview.amount?.toFixed(2) || 'N/A'}
+              ₹{preview.amount?.toFixed(2) || 'N/A'}
             </p>
 
             <div className="flex gap-2 mt-4">

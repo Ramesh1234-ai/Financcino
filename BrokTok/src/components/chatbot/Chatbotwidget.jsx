@@ -18,7 +18,6 @@ export default function ChatbotWidget() {
       >
         <Bot className="text-black" size={22} />
       </button>
-
       {open && <ChatWindow onClose={() => setOpen(false)} />}
     </>
   );

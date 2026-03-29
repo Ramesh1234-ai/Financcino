@@ -1,13 +1,13 @@
 // Backend/routes/expenses.routes.js
 import express from 'express';
 import * as expenseController from '../controllers/expense.controller.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { requireAuth } from '../middleware/auth.js';
 import { validateExpense } from '../middleware/validation.js';
 
 const router = express.Router();
 
 // All expense routes require authentication
-router.use(authenticateToken);
+router.use(requireAuth);
 
 router.get('/', expenseController.getExpenses);
 router.post('/', validateExpense, expenseController.createExpense);

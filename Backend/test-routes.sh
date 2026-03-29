@@ -5,7 +5,6 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
-
 echo "================================"
 echo "Testing Kharcha-Core API Routes"
 echo "================================"
@@ -20,7 +19,6 @@ else
   echo -e "${RED}✗ Health Check: FAIL${NC}"
 fi
 echo ""
-
 # Test 2: Register User
 echo -e "${YELLOW}Testing User Registration...${NC}"
 REGISTER=$(curl -s -X POST http://localhost:3000/api/auth/register \
@@ -52,7 +50,6 @@ else
   echo -e "${RED}✗ Login: FAIL${NC}"
 fi
 echo ""
-
 # Test 4: Get Current User
 echo -e "${YELLOW}Testing Get Current User...${NC}"
 CURRENT_USER=$(curl -s -X GET http://localhost:3000/api/auth/me \
@@ -65,7 +62,6 @@ else
   echo "  Response: $CURRENT_USER"
 fi
 echo ""
-
 # Test 5: Get Categories
 echo -e "${YELLOW}Testing Get Categories...${NC}"
 CATEGORIES=$(curl -s -X GET http://localhost:3000/api/categories \

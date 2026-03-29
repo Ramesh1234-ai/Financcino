@@ -1,5 +1,6 @@
 import { useState } from "react";
 import useAuth from "../../hooks/useAuth";
+import * as api from "../../services/api";
 
 export default function useChatbot() {
   const { getToken } = useAuth();
@@ -18,44 +19,61 @@ export default function useChatbot() {
     setLoading(true);
 
     try {
-      const token = await getToken();
-      const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
-      
-      const response = await fetch(`${baseUrl}/chat`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
-        },
-        body: JSON.stringify({ message: userMsg.text }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      if (data.success) {
+      // Fetch token with error handling
+      let token = null;
+      try {
+        token = await getToken();
+        if (!token) {
+          console.warn("⚠️  [usechatbot] Token is null after getToken()");
+          throw new Error("Not authenticated - please login");
+        }
+        console.log("✅ [usechatbot] Token obtained, length:", token.length);
+      } catch (tokenErr) {
+        console.error("❌ [usechatbot] Failed to get token:", tokenErr.message);
         setMessages((prev) => [
           ...prev,
-          { text: data.data.message || "Processing...", sender: "bot" },
+          {
+            text: `Authentication error: ${tokenErr.message}. Please refresh and login again.`,
+            sender: "bot",
+          },
         ]);
-      } else {
-        throw new Error(data.error?.message || "Unknown error");
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error("Chat error:", err);
+
+      // Send message to API
+      console.log("💬 [usechatbot] Sending message to API...");
+      const data = await api.sendChatMessage(userMsg.text, token);
+
+      if (data?.error) {
+        console.error("❌ [usechatbot] API error:", data.error);
+        throw new Error(data.error);
+      }
+
+      if (!data?.success && !data?.data?.message) {
+        console.error("❌ [usechatbot] Invalid response format:", data);
+        throw new Error("Invalid server response");
+      }
+
+      const botMessage = data?.data?.message || data?.message || "Processing...";
+      console.log("✅ [usechatbot] Bot response received:", botMessage.slice(0, 50) + "...");
+      
       setMessages((prev) => [
         ...prev,
-        { 
-          text: `Error: ${err.message || "Server error. Try again."}`, 
-          sender: "bot" 
+        { text: botMessage, sender: "bot" },
+      ]);
+    } catch (err) {
+      console.error("❌ [usechatbot] Chat error:", err.message);
+      setMessages((prev) => [
+        ...prev,
+        {
+          text: `Error: ${err.message || "Server error. Try again later."}`,
+          sender: "bot",
         },
       ]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return { messages, input, setInput, sendMessage, loading };

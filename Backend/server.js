@@ -14,15 +14,13 @@ import categoryRoutes from './routes/categories.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import chatbotRoutes from './routes/chatbot.routes.js';
 import receiptsRoutes from './routes/receipts.routes.js';
-
 // Load environment variables
 dotenv.config();
-
 const app = express();
 const PORT = config.PORT;
 const MONGODB_URI = config.MONGODB_URI;
 const NODE_ENV = config.NODE_ENV;
-
+const JWT_SECRET=config.JWT_SECRET;
 // ==================== MIDDLEWARE ====================
 
 // Security middleware
@@ -45,7 +43,6 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(requestLogger);
 
 // ==================== DATABASE CONNECTION ====================
-
 async function connectDB() {
   try {
     const conn = await mongoose.connect(MONGODB_URI, {
@@ -86,7 +83,6 @@ app.get('/api/health', (req, res) => {
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
   });
 });
-
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/expenses', expenseRoutes);
@@ -107,17 +103,13 @@ app.use((req, res) => {
     },
   });
 });
-
 // Error handling middleware (MUST be last)
 app.use(errorHandler);
-
 // ==================== SERVER STARTUP ====================
-
 async function startServer() {
   try {
     // Connect to MongoDB first
     await connectDB();
-
     // Start listening
     const server = app.listen(PORT, () => {
       logger.info(`
@@ -126,10 +118,10 @@ async function startServer() {
         📍 Listening on port ${PORT}
         🌐 API Base URL: http://localhost:${PORT}/api
         🏥 Health Check: http://localhost:${PORT}/api/health
+        ❤️ Jwt Secret Key :${JWT_SECRET} 
         ========================================
       `);
     });
-
     // Graceful shutdown
     function gracefulShutdown() {
       logger.info('Shutting down gracefully...');
@@ -138,16 +130,13 @@ async function startServer() {
         logger.info('✓ Server closed, database connection closed');
         process.exit(0);
       });
-
       setTimeout(() => {
         logger.error('💥 Could not close connections in time, forcefully shutting down');
         process.exit(1);
       }, 30000); // 30 second timeout
     }
-
     process.on('SIGTERM', gracefulShutdown);
     process.on('SIGINT', gracefulShutdown);
-
     // Handle uncaught exceptions
     process.on('uncaughtException', (err) => {
       logger.error('💥 Uncaught Exception:', err);
@@ -163,8 +152,6 @@ async function startServer() {
     process.exit(1);
   }
 }
-
 // Start the server
 startServer();
-
 export default app;

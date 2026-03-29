@@ -14,21 +14,17 @@ if (!clerkKey) {
   console.warn('   Get your key from https://dashboard.clerk.com')
 }
 
-const Root = (
-  <BrowserRouter>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </BrowserRouter>
-)
-
-// Always render with ClerkProvider, but warn if key is missing
 const rootElement = document.getElementById('root')
 
 if (clerkKey) {
+  // ✅ CORRECT: ClerkProvider wraps EVERYTHING (must be outermost provider)
   createRoot(rootElement).render(
     <ClerkProvider publishableKey={clerkKey}>
-      {Root}
+      <BrowserRouter>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </BrowserRouter>
     </ClerkProvider>
   )
 } else {
@@ -58,4 +54,3 @@ if (clerkKey) {
     </div>
   )
 }
-

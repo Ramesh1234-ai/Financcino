@@ -1,26 +1,38 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
+import * as api from '../../services/api'
+import useAuth from '../../hooks/useAuth'
 
 export default function CreateExpenseFromReceiptModal({ receipt, onClose, onCreate, loading }) {
+  const { getToken } = useAuth()
+  const [categories, setCategories] = useState([])
   const [formData, setFormData] = useState({
     title: receipt?.merchant || 'Receipt expense',
-    description: receipt?.ocr?.text || '',
-    amount: receipt?.ocr?.total || '',
-    category: 'food',
+    description: receipt?.extractedData?.text || '',
+    amount: receipt?.extractedData?.total || '',
+    categoryId: '',
     date: receipt?.date || new Date().toISOString().split('T')[0],
   })
 
   const [error, setError] = useState('')
 
-  const categories = [
-    'food',
-    'transportation',
-    'entertainment',
-    'shopping',
-    'utilities',
-    'healthcare',
-    'other'
-  ]
+  useEffect(() => {
+    loadCategories()
+  }, [])
+
+  const loadCategories = async () => {
+    try {
+      const token = await getToken()
+      const res = await api.getCategories(token)
+      const cats = res?.data?.categories || []
+      setCategories(cats)
+      if (cats.length > 0) {
+        setFormData(prev => ({ ...prev, categoryId: cats[0]._id }))
+      }
+    } catch (err) {
+      console.error('Failed to load categories', err)
+    }
+  }
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -46,12 +58,11 @@ export default function CreateExpenseFromReceiptModal({ receipt, onClose, onCrea
 
     try {
       await onCreate({
-        title: formData.title.trim(),
-        description: formData.description.trim(),
+        description: formData.title.trim(),
         amount: parseFloat(formData.amount),
-        category: formData.category,
+        categoryId: formData.categoryId,
         date: formData.date,
-        receipt_id: receipt?.id,
+        notes: formData.description.trim(),
       })
       onClose()
     } catch (err) {
@@ -85,8 +96,8 @@ export default function CreateExpenseFromReceiptModal({ receipt, onClose, onCrea
               <div className="text-sm text-gray-600 flex-1">
                 <p className="font-medium text-gray-800">{receipt.merchant}</p>
                 <p className="text-xs">{receipt.date}</p>
-                {receipt.ocr?.total && (
-                  <p className="font-semibold mt-1">${receipt.ocr.total.toFixed(2)}</p>
+                {receipt.extractedData?.total && (
+                  <p className="font-semibold mt-1">₹{receipt.extractedData.total.toFixed(2)}</p>
                 )}
               </div>
             </div>
@@ -139,14 +150,14 @@ export default function CreateExpenseFromReceiptModal({ receipt, onClose, onCrea
               Category
             </label>
             <select
-              name="category"
-              value={formData.category}
+              name="categoryId"
+              value={formData.categoryId}
               onChange={handleChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
             >
               {categories.map(cat => (
-                <option key={cat} value={cat}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                <option key={cat._id} value={cat._id}>
+                  {cat.name}
                 </option>
               ))}
             </select>

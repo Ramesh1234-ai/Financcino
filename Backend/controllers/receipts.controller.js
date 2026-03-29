@@ -2,21 +2,157 @@ import logger from '../utils/logger.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { config } from '../config/config.js';
 import { Receipt } from '../models/Receipt.models.js';
+import { Expense } from '../models/expense.models.js';
+import { Category } from '../models/Category.models.js';
+import { createWorker } from 'tesseract.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
 
 /**
- * Upload and process receipt with OCR
- * Note: For production, integrate Tesseract.js, AWS Textract, or Google Cloud Vision
+ * Enhanced Gemini-based OCR parsing for receipts
+ * Uses structured JSON extraction for reliable data
  */
+async function parseReceiptWithGemini(ocrText) {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const prompt = `You are a receipt parser. Extract EXACTLY these fields from the receipt OCR text below.
+Return a JSON object (no markdown, no code blocks, just plain JSON).
+OCR TEXT:
+---
+${ocrText}
+---
+JSON FORMAT:
+{
+  "amount": <positive number (NOT string)>,
+  "currency": "<3-letter code like USD or INR>",
+  "date": "<YYYY-MM-DD>",
+  "merchant": "<store or restaurant name>",
+  "category": "<Food|Transport|Shopping|Entertainment|Utilities|Health|Education|Other>",
+  "items": [{"name": "<item>", "price": <number>}]
+}
+CRITICAL RULES:
+1. amount: MUST be a valid number. Look for: Total, Grand Total, Amount Due, Subtotal + Tax
+2. DO NOT include tax, tip, or delivery separately - extract THE TOTAL ONLY
+3. If amount has multiple values, pick the largest one (usually the final total)
+4. Ensure amount > 0 and is realistic (e.g., 15.99, not 1599)
+5. date: Extract from receipt. Use today if missing. Must be YYYY-MM-DD format
+6. merchant: Store name, restaurant name, or vendor name
+7. category: Choose ONE from the list based on merchant/items
+8. items: Try to list purchased items with prices if visible
+9. If a field is not found, use null but ALWAYS include all keys
+10. Return ONLY valid JSON - no explanations, no markdown`;
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text().trim();
+    
+    // Remove markdown code blocks if present
+    let jsonStr = responseText;
+    if (jsonStr.includes('```json')) {
+      jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();
+    } else if (jsonStr.includes('```')) {
+      jsonStr = jsonStr.split('```')[1].split('```')[0].trim();
+    }
+    
+    const parsed = JSON.parse(jsonStr);
+    
+    // Validate extracted data
+    if (!parsed.amount || typeof parsed.amount !== 'number' || parsed.amount <= 0) {
+      logger.warn('⚠️  [parseReceiptWithGemini] Invalid amount:', parsed.amount);
+      throw new Error('Invalid amount extracted from receipt');
+    }
+    
+    // Ensure category is valid
+    const validCategories = ['Food', 'Transport', 'Shopping', 'Entertainment', 'Utilities', 'Health', 'Education', 'Other'];
+    if (!validCategories.includes(parsed.category)) {
+      parsed.category = 'Other';
+    }
+    
+    // Ensure date is valid
+    if (!parsed.date || isNaN(new Date(parsed.date).getTime())) {
+      parsed.date = new Date().toISOString().split('T')[0];
+    }
+    
+    logger.info('✅ [parseReceiptWithGemini] Successfully parsed receipt:', {
+      amount: parsed.amount,
+      currency: parsed.currency,
+      category: parsed.category,
+      date: parsed.date,
+      merchant: parsed.merchant
+    });
+    
+    return parsed;
+  } catch (err) {
+    logger.error('❌ [parseReceiptWithGemini] Gemini parsing failed:', err.message);
+    // Fallback to basic regex parsing
+    return parseReceiptBasic(ocrText);
+  }
+}
+
+/**
+ * Fallback basic regex-based parsing
+ */
+function parseReceiptBasic(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  
+  // Extract amount - look for currency symbols or amount patterns
+  let amount = null;
+  const amountPattern = /(?:total|amount|sum|due|balance)[\s:]*\$?(\d+(?:\.\d{2})?)/i;
+  
+  for (const line of lines) {
+    const match = line.match(amountPattern);
+    if (match) {
+      amount = parseFloat(match[1]);
+      break;
+    }
+    // Fallback: look for any monetary value at end of line
+    const dollarMatch = line.match(/\$(\d+(?:\.\d{2})?)/);
+    if (dollarMatch && parseFloat(dollarMatch[1]) > 0) {
+      amount = parseFloat(dollarMatch[1]);
+    }
+  }
+
+  // Extract date
+  let date = null;
+  const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/;
+  for (const line of lines) {
+    const match = line.match(datePattern);
+    if (match) {
+      date = match[1];
+      break;
+    }
+  }
+
+  // Guess category from keywords
+  const textLower = text.toLowerCase();
+  let category = 'Other';
+  if (textLower.includes('restaurant') || textLower.includes('cafe') || textLower.includes('food')) {
+    category = 'Food';
+  } else if (textLower.includes('gas') || textLower.includes('fuel') || textLower.includes('uber') || textLower.includes('taxi')) {
+    category = 'Transport';
+  } else if (textLower.includes('store') || textLower.includes('shop') || textLower.includes('mall')) {
+    category = 'Shopping';
+  }
+
+  return {
+    amount: amount || null,
+    currency: 'USD',
+    date: date || new Date().toISOString().split('T')[0],
+    merchant: null,
+    items: [],
+    category,
+  };
+}
+
 export async function uploadReceipt(req, res, next) {
 	try {
-		const userId = req.userId;
+		const userId = req.user.id;
 		
 		if (!req.file) {
 			throw new AppError('No file provided', 400);
 		}
 
 		const file = req.file;
-		logger.info('Receipt upload', {
+		logger.info('📸 [uploadReceipt] Starting receipt upload', {
 			userId,
 			fileName: file.originalname,
 			fileSize: file.size,
@@ -29,18 +165,16 @@ export async function uploadReceipt(req, res, next) {
 			throw new AppError('Only images and PDFs are supported', 400);
 		}
 
-		// In production: Run OCR on the file
-		// For now, create a mock extracted data response
-		const extractedData = {
-			text: `Receipt from ${new Date().toLocaleDateString()}\nFile: ${file.originalname}`,
-			dates: [new Date().toISOString().split('T')[0]],
-			total: Math.round(Math.random() * 10000) / 100, // Mock amount
-			items: [
-				{ description: 'Item 1', amount: 10.50 },
-				{ description: 'Item 2', amount: 25.00 }
-			],
-			confidence: 0.85
-		};
+		// Perform OCR on the file
+		logger.info('🔍 [uploadReceipt] Running OCR...');
+		const worker = await createWorker('eng');
+		const { data: { text } } = await worker.recognize(file.buffer);
+		await worker.terminate();
+
+		logger.info('📝 [uploadReceipt] OCR complete, text length:', text.length);
+
+		// Parse receipt data using Gemini
+		const extractedData = await parseReceiptWithGemini(text);
 
 		// Store receipt in database
 		const receipt = await Receipt.create({
@@ -48,22 +182,112 @@ export async function uploadReceipt(req, res, next) {
 			fileName: file.originalname,
 			fileSize: file.size,
 			mimeType: file.mimetype,
-			extractedData,
-			fileUrl: `/uploads/${file.filename || file.originalname}` // Replace with actual storage path
+			extractedData: {
+				text,
+				...extractedData
+			},
+			isProcessed: false,
+			fileUrl: `/uploads/${file.filename || file.originalname}`
 		});
+
+		logger.info('✅ [uploadReceipt] Receipt saved:', receipt._id);
+
+		// Automatically create expense if amount is valid
+		if (extractedData.amount && extractedData.amount > 0) {
+			try {
+				logger.info('💾 [uploadReceipt] Creating expense from receipt...');
+
+				// Get or create category
+				let category = await Category.findOne({
+					userId,
+					name: new RegExp(extractedData.category, 'i')
+				});
+
+				if (!category) {
+					// Create category if it doesn't exist
+					category = await Category.create({
+						userId,
+						name: extractedData.category,
+						color: '#3498db',
+						icon: 'receipt'
+					});
+					logger.info('📂 [uploadReceipt] Created new category:', category.name);
+				}
+
+				// Create expense
+				const expense = await Expense.create({
+					userId,
+					description: extractedData.merchant || file.originalname,
+					amount: extractedData.amount,
+					categoryId: category._id,
+					date: extractedData.date ? new Date(extractedData.date) : new Date(),
+					paymentMethod: 'card',
+					notes: `Receipt ID: ${receipt._id}`,
+					tags: ['ocr', 'receipt']
+				});
+
+				// Mark receipt as processed
+				receipt.isProcessed = true;
+				await receipt.save();
+
+				logger.info('✅ [uploadReceipt] Expense created:', {
+					expenseId: expense._id,
+					amount: expense.amount,
+					category: category.name
+				});
+
+				return res.status(201).json({
+					success: true,
+					data: {
+						receipt: {
+							id: receipt._id,
+							fileName: receipt.fileName,
+							uploadedAt: receipt.createdAt,
+							extractedData: receipt.extractedData,
+							isProcessed: true,
+						},
+						expense: {
+							id: expense._id,
+							amount: expense.amount,
+							category: category.name,
+							date: expense.date,
+						},
+						message: 'Receipt uploaded and expense created successfully'
+					}
+				});
+			} catch (expenseErr) {
+				logger.warn('⚠️  [uploadReceipt] Failed to create expense, but receipt saved:', expenseErr.message);
+				// Still return success since receipt was saved
+				return res.status(201).json({
+					success: true,
+					data: {
+						receipt: {
+							id: receipt._id,
+							fileName: receipt.fileName,
+							uploadedAt: receipt.createdAt,
+							extractedData: receipt.extractedData,
+							isProcessed: false,
+						},
+						message: 'Receipt uploaded successfully (expense creation failed)'
+					}
+				});
+			}
+		}
 
 		res.status(201).json({
 			success: true,
 			data: {
-				id: receipt._id,
-				fileName: receipt.fileName,
-				uploadedAt: receipt.createdAt,
-				extractedData: receipt.extractedData,
-				message: 'Receipt uploaded and processed successfully'
+				receipt: {
+					id: receipt._id,
+					fileName: receipt.fileName,
+					uploadedAt: receipt.createdAt,
+					extractedData: receipt.extractedData,
+					message: 'Receipt uploaded and processed'
+				}
 			}
 		});
 	} catch (error) {
-		logger.error('Receipt upload error:', error);
+		logger.error('❌ [uploadReceipt] Error:', error.message);
 		next(error);
 	}
 }
@@ -73,7 +297,7 @@ export async function uploadReceipt(req, res, next) {
  */
 export async function getReceipts(req, res, next) {
 	try {
-		const userId = req.userId;
+		const userId = req.user.id;
 		const page = parseInt(req.query.page) || 1;
 		const itemsPerPage = config.ITEMS_PER_PAGE || 50;
 		const skip = (page - 1) * itemsPerPage;
@@ -112,7 +336,7 @@ export async function getReceipts(req, res, next) {
  */
 export async function getReceiptById(req, res, next) {
 	try {
-		const userId = req.userId;
+		const userId = req.user.id;
 		const { id } = req.params;
 
 		const receipt = await Receipt.findOne({ _id: id, userId });
@@ -132,13 +356,12 @@ export async function getReceiptById(req, res, next) {
 		next(error);
 	}
 }
-
 /**
  * Delete receipt
  */
 export async function deleteReceipt(req, res, next) {
 	try {
-		const userId = req.userId;
+		const userId = req.user.id;
 		const { id } = req.params;
 
 		const receipt = await Receipt.findOneAndDelete({ _id: id, userId });
@@ -165,14 +388,12 @@ export async function deleteReceipt(req, res, next) {
  */
 export async function createExpenseFromReceipt(req, res, next) {
 	try {
-		const userId = req.userId;
+		const userId = req.user.id;
 		const { receiptId, description, amount, categoryId, date } = req.body;
-
-		const receipt = receipts.find(r => r.id === receiptId && r.userId === userId);
+		const receipt = receipt.find(r => r.id === receiptId && r.userId === userId);
 		if (!receipt) {
 			throw new AppError('Receipt not found', 404);
 		}
-
 		// In production: Create actual Expense document in MongoDB
 		const expense = {
 			id: `expense_${Date.now()}`,
@@ -185,7 +406,6 @@ export async function createExpenseFromReceipt(req, res, next) {
 			receiptImage: receipt.fileUrl,
 			createdAt: new Date().toISOString()
 		};
-
 		logger.info('Expense created from receipt', {
 			userId,
 			receiptId,

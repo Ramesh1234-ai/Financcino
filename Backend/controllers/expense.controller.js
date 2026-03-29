@@ -8,12 +8,10 @@ export async function getExpenses(req, res, next) {
   try {
     const { page = 1, limit = config.ITEMS_PER_PAGE, category } = req.query;
     const skip = (Math.max(1, parseInt(page)) - 1) * parseInt(limit);
-
-    const query = { userId: req.userId };
+    const query = { userId: req.user.id };
     if (category) {
       query.categoryId = category;
     }
-
     const [expenses, total] = await Promise.all([
       Expense.find(query)
         .populate('categoryId', 'name color')
@@ -39,13 +37,12 @@ export async function getExpenses(req, res, next) {
     next(err);
   }
 }
-
 export async function createExpense(req, res, next) {
   try {
     const { description, amount, categoryId, date, paymentMethod, tags, notes } = req.body;
 
     const expense = await Expense.create({
-      userId: req.userId,
+      userId: req.user.id,
       description,
       amount,
       categoryId,
@@ -55,7 +52,7 @@ export async function createExpense(req, res, next) {
       notes: notes || null,
     });
 
-    logger.info(`Expense created: ${expense._id} by user ${req.userId}`);
+    logger.info(`Expense created: ${expense._id} by user ${req.user.id}`);
 
     res.status(201).json({
       success: true,
@@ -77,7 +74,7 @@ export async function getExpenseById(req, res, next) {
     }
 
     // Verify ownership
-    if (expense.userId._id.toString() !== req.userId) {
+    if (expense.userId._id.toString() !== req.user.id) {
       throw new AppError('Not authorized', 403);
     }
 
@@ -97,7 +94,7 @@ export async function updateExpense(req, res, next) {
     }
 
     // Verify ownership
-    if (expense.userId.toString() !== req.userId) {
+    if (expense.userId.toString() !== req.user.id) {
       throw new AppError('Not authorized', 403);
     }
 
@@ -132,7 +129,7 @@ export async function deleteExpense(req, res, next) {
     }
 
     // Verify ownership
-    if (expense.userId.toString() !== req.userId) {
+    if (expense.userId.toString() !== req.user.id) {
       throw new AppError('Not authorized', 403);
     }
 

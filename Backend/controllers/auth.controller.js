@@ -9,16 +9,13 @@ import logger from '../utils/logger.js';
 export async function register(req, res, next) {
   try {
     const { fullName, email, password } = req.body;
-
     // Check if user already exists
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       throw new AppError('Email already registered', 409);
     }
-
     // Hash password
     const hashedPassword = await bcrypt.hash(password, config.BCRYPT_ROUNDS);
-
     // Generate username from email
     let username = email.split('@')[0].toLowerCase();
     let usernameExists = await User.findOne({ username });
@@ -28,7 +25,6 @@ export async function register(req, res, next) {
       usernameExists = await User.findOne({ username });
       counter++;
     }
-
     // Create user
     const user = await User.create({
       fullName,
@@ -36,12 +32,9 @@ export async function register(req, res, next) {
       username,
       password: hashedPassword,
     });
-
     // Generate token
     const token = generateToken(user._id);
-
     logger.info(`User registered: ${user._id}`);
-
     res.status(201).json({
       success: true,
       data: {
@@ -57,7 +50,6 @@ export async function register(req, res, next) {
     next(err);
   }
 }
-
 export async function login(req, res, next) {
   try {
     const { email, password } = req.body;
@@ -97,7 +89,7 @@ export async function login(req, res, next) {
 
 export async function logout(req, res, next) {
   try {
-    logger.info(`User logged out: ${req.userId}`);
+    logger.info(`User logged out: ${req.user.id}`);
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (err) {
     next(err);
@@ -106,7 +98,7 @@ export async function logout(req, res, next) {
 
 export async function getCurrentUser(req, res, next) {
   try {
-    const user = await User.findById(req.userId);
+    const user = await User.findById(req.user.id);
     if (!user) {
       throw new AppError('User not found', 404);
     }
@@ -118,14 +110,12 @@ export async function getCurrentUser(req, res, next) {
     next(err);
   }
 }
-
 export async function refreshToken(req, res, next) {
   try {
     const { token } = req.body;
     if (!token) {
       throw new AppError('Token required', 400);
     }
-
     const decoded = jwt.verify(token, config.JWT_SECRET, { ignoreExpiration: true });
     const newToken = generateToken(decoded.id);
 
@@ -137,7 +127,6 @@ export async function refreshToken(req, res, next) {
     next(err);
   }
 }
-
 function generateToken(userId) {
   return jwt.sign({ id: userId }, config.JWT_SECRET, {
     expiresIn: config.JWT_EXPIRE,

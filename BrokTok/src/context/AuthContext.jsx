@@ -1,8 +1,6 @@
 import React, { createContext, useEffect, useState } from 'react'
-import { useUser, useClerk, useAuth as useClerkAuth } from '@clerk/clerk-react'
-
+import { useUser, useClerk, useAuth } from '@clerk/clerk-react'
 export const AuthContext = createContext(null)
-
 /**
  * AuthProvider - Clerk-based authentication
  * Synchronizes Clerk authentication with local app state
@@ -10,12 +8,10 @@ export const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const clerkUser = useUser()
   const clerk = useClerk()
-  const clerkAuth = useClerkAuth()
-
+  const clerkAuth = useAuth()  // ✅ This has getToken() method
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-
   // Sync Clerk user to local state
   useEffect(() => {
     try {
@@ -49,21 +45,24 @@ export function AuthProvider({ children }) {
       setLoading(false)
     }
   }, [clerkUser?.isLoaded, clerkUser?.isSignedIn, clerkUser?.user])
-
   // Get Clerk token for API calls
   const getToken = async () => {
     try {
-      if (clerkAuth?.isSignedIn && clerkAuth.getToken) {
+      // ✅ useAuth() has getToken method if user is signed in
+      if (clerkAuth?.isSignedIn && typeof clerkAuth?.getToken === 'function') {
         const token = await clerkAuth.getToken()
+        console.debug('✅ [AuthContext.getToken] Token fetched successfully, length:', token?.length)
         return token
+      }
+      if (!clerkAuth?.isSignedIn) {
+        console.warn('⚠️  [AuthContext.getToken] User not signed in - cannot fetch token')
       }
       return null
     } catch (err) {
-      console.error('Failed to get Clerk token:', err)
+      console.error('❌ [AuthContext.getToken] Failed to get Clerk token:', err.message)
       return null
     }
   }
-
   const logout = async () => {
     try {
       if (clerk?.signOut) {
@@ -76,7 +75,6 @@ export function AuthProvider({ children }) {
       setError(err.message || 'Logout failed')
     }
   }
-
   const value = {
     user,
     loading,
@@ -85,7 +83,6 @@ export function AuthProvider({ children }) {
     getToken,
     logout,
   }
-
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 export default AuthContext

@@ -1,4 +1,3 @@
-// Backend/utils/logger.js
 import winston from 'winston';
 import { config } from '../config/config.js';
 
@@ -35,8 +34,7 @@ if (config.NODE_ENV !== 'production') {
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.printf(({ level, message, timestamp, ...meta }) => {
-          const metaStr = Object.keys(meta).length ? JSON.stringify(meta, null, 2) : '';
-          return `[${timestamp}] ${level}: ${message} ${metaStr}`;
+          return `[${timestamp}] ${level}: ${message} ${Object.keys(meta).length ? JSON.stringify(meta) : ''}`;
         })
       ),
     })

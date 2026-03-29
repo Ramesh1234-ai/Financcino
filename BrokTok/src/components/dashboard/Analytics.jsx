@@ -6,10 +6,22 @@ import {
 } from "recharts";
 import Sidebar from "../common/Sidebar";
 import useAuth from "../../hooks/useAuth";
+import * as api from "../../services/api";
 import { useNavigate } from "react-router-dom";
 
 // ─── Color palette (matches dashboard's indigo/violet accent tones) ────────────
 const CAT_COLORS = ["#6366f1","#8b5cf6","#a78bfa","#c084fc","#e879f9","#f472b6"];
+
+async function fetchAnalytics(range = 'month', token) {
+  try {
+    const res = await api.getAnalytics(range, token)
+    if (res?.error) throw new Error(res.error)
+    return res?.data || res || {}
+  } catch (err) {
+    console.error('fetchAnalytics error:', err)
+    throw err
+  }
+}
 
 // ─── API fetch configuration ──────────────────────────────────────────────────
 
@@ -100,7 +112,7 @@ function PieLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
 // ─── Main Analytics Page ───────────────────────────────────────────────────────
 export default function AnalyticsPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, getToken } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [range, setRange] = useState("month");
   const [data, setData] = useState(null);
@@ -111,31 +123,30 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchAnalytics(range);
+      const token = await getToken();
+      const result = await fetchAnalytics(range, token);
       setData(result);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [range]);
+  }, [range, getToken]);
 
   useEffect(() => { loadData(); }, [loadData]);
-
   const stats = data?.stats;
   const totalCategories = data?.categories?.reduce((s, c) => s + c.value, 0) || 1;
-
   const statCards = [
     {
       label: "AVERAGE MONTHLY SPEND",
-      value: `$${stats?.avgSpend?.toLocaleString() ?? "—"}`,
+      value: `₹${stats?.avgSpend?.toLocaleString() ?? "—"}`,
       sub: "Per month average",
       badge: "gray",
       badgeText: "This period",
     },
     {
       label: "BUDGET REMAINING",
-      value: `$${stats?.budgetRemaining?.toLocaleString() ?? "—"}`,
+      value: `₹${stats?.budgetRemaining?.toLocaleString() ?? "—"}`,
       sub: "Left this period",
       badge: stats?.budgetRemaining > 0 ? "green" : "gray",
       badgeText: stats?.budgetRemaining > 0 ? "▲ On track" : "▼ Over budget",
@@ -181,14 +192,14 @@ export default function AnalyticsPage() {
           </div>
 
           {/* ── Error banner ── */}
-          {/* {error && (
+          {error && (
             <div className="mb-5 flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-red-500 text-sm">
               <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
               </svg>
-              Could not reach API — showing demo data.
+              {error}
             </div>
-          )} */}
+          )}
 
           {/* ── Time range toggle ── */}
           <div className="mb-6">

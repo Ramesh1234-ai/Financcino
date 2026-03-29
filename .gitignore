@@ -15,7 +15,6 @@ pnpm-lock.yaml
 .env.new                # Old/temporary env files
 .env.old
 .env.backup
-
 # IDE and Editor
 .vscode/
 .idea/

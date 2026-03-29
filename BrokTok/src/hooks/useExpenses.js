@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react'
 import useAuth from './useAuth'
 import * as api from '../services/api'
-
 export default function useExpenses() {
 	const { getToken } = useAuth() || {}
 	const [transactions, setTransactions] = useState([])
@@ -13,32 +12,44 @@ export default function useExpenses() {
 
 	const loadExpenses = useCallback(async () => {
 		if (!getToken) {
-			console.error('useExpenses: getToken not available')
+			console.error('❌ useExpenses: getToken not available')
 			return
 		}
-
 		setLoading(true)
 		setError(null)
 
 		try {
-			const res = await api.getExpenses(getToken)
+			console.log('📍 [useExpenses.loadExpenses] Starting API call...')
+			const token = await getToken()
+			console.log('🔑 [useExpenses.loadExpenses] Got token?', !!token, 'length:', token?.length || 0)
+			
+			if (!token) {
+				console.error('❌ [useExpenses.loadExpenses] Token is null/undefined!')
+				setError('Not authenticated - please login')
+				setLoading(false)
+				return
+			}
+			
+			console.log('📤 [useExpenses.loadExpenses] Calling api.getExpenses with valid token...')
+			const res = await api.getExpenses(token)
+			console.log('📥 [useExpenses.loadExpenses] API response:', res)
 			
 			if (res?.error) {
 				setError(res.error)
 				setLoading(false)
 				return
 			}
-
-			const tx = res?.data || []
-
+			const tx = Array.isArray(res?.data?.expenses)
+				? res.data.expenses
+				: Array.isArray(res?.data)
+				? res.data
+				: []
 			if (!Array.isArray(tx)) {
 				console.warn('Transactions is not an array:', tx)
 				setLoading(false)
 				return
 			}
-
 			setTransactions(tx)
-
 			const total = tx.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0)
 			const avg = tx.length > 0 ? total / Math.min(tx.length, 30) : 0
 			setStats({ 
@@ -47,7 +58,6 @@ export default function useExpenses() {
 				transactions: tx.length, 
 				savingsGoal: 0 
 			})
-
 			const catMap = {}
 			tx.forEach(t => {
 				const c = t.categoryId?.name || t.category || 'Other'
@@ -58,7 +68,6 @@ export default function useExpenses() {
 			})
 			const cats = Object.values(catMap)
 			setCategories(cats)
-
 			// simple chart data: group by date
 			const byDate = {}
 			tx.forEach(t => {
@@ -87,14 +96,26 @@ export default function useExpenses() {
 		}
 
 		try {
-			const res = await api.createExpense(payload, getToken)
+			console.log('📍 [useExpenses.addExpense] Starting...')
+			const token = await getToken()  // ✅ Await token first
+			console.log('🔑 [useExpenses.addExpense] Got token?', !!token, 'length:', token?.length || 0)
+			
+			if (!token) {
+				console.error('❌ [useExpenses.addExpense] Token is null/undefined!')
+				throw new Error('Failed to get authentication token')
+			}
+			
+			console.log('📤 [useExpenses.addExpense] Calling api.createExpense...')
+			const res = await api.createExpense(payload, token)  // ✅ Pass resolved token
+			console.log('📥 [useExpenses.addExpense] API response:', res)
+			
 			if (res?.error) {
 				throw new Error(res.error)
 			}
 			await loadExpenses()
 			return res?.data || res
 		} catch (err) {
-			console.error('addExpense error:', err)
+			console.error('❌ [useExpenses.addExpense] error:', err)
 			throw err
 		}
 	}, [getToken, loadExpenses])

@@ -1,10 +1,8 @@
 import mongoose from "mongoose";
-
 const CategorySchema = new mongoose.Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: true,
     },
     name: {
@@ -31,5 +29,4 @@ const CategorySchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
 export const Category = mongoose.model("Category", CategorySchema);

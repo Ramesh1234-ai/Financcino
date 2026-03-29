@@ -1,10 +1,8 @@
 import mongoose from "mongoose";
-
 const ReceiptSchema = new mongoose.Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: true,
     },
     fileName: {
@@ -46,5 +44,4 @@ const ReceiptSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
 export const Receipt = mongoose.model("Receipt", ReceiptSchema);

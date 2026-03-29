@@ -1,10 +1,11 @@
+<<<<<<< HEAD
 
+=======
+# 💰 Kharcha-Core: Full-Stack Expense Tracking Application
+>>>>>>> 37e43dd (Adding A Better Backend Server Connectivity)
 A modern, full-stack financial expense management application built with **React** (frontend) and **Node.js/Express** (backend). Designed to help users track expenses, manage budgets, and gain financial insights through intuitive interfaces and AI-powered chatbot assistance.
-
 **Live Repository:** [Financcino on GitHub](https://github.com/Ramesh1234-ai/Financcino)
-
 ---
-
 ## 📋 Table of Contents
 
 - [Overview](#overview)
@@ -15,18 +16,27 @@ A modern, full-stack financial expense management application built with **React
 - [Installation & Setup](#installation--setup)
   - [Backend Setup](#backend-setup)
   - [Frontend Setup](#frontend-setup)
+<<<<<<< HEAD
+=======
+- [Environment Configuration](#environment-configuration)
+- [Running the Application](#running-the-application)
+- [API Documentation](#api-documentation)
+- [Project Architecture](#project-architecture)
+- [Development Workflow](#development-workflow)
+- [Troubleshooting](#troubleshooting)
+- [Security Notes](#security-notes)
+- [Contributing](#contributing)
+- [License](#license)
+>>>>>>> 37e43dd (Adding A Better Backend Server Connectivity)
 ---
 ## 🎯 Overview
-
 **Kharcha-Core** is a comprehensive expense tracking system designed for personal finance management. The application enables users to:
-
 - 📝 Log and categorize expenses
 - 💳 Upload and process receipts with OCR capabilities
 - 📊 Visualize spending patterns with analytics dashboards
 - 💬 Get AI-powered financial advice through the integrated chatbot
 - 🏦 Set and track budget goals
 - 🔐 Secure authentication and data privacy
-
 **Project Name Etymology:** "Kharcha" (खर्च) is Urdu/Hindi for "expense" - reflecting the application's core functionality.
 
 ---
@@ -48,7 +58,6 @@ A modern, full-stack financial expense management application built with **React
 | **Winston** | ^3.10.0 | Logging |
 | **CORS** | ^2.8.5 | Cross-origin requests |
 | **Express-Rate-Limit** | ^7.0.0 | API rate limiting |
-
 ### **Frontend**
 | Technology | Version | Purpose |
 |-----------|---------|---------|
@@ -61,16 +70,12 @@ A modern, full-stack financial expense management application built with **React
 | **React Icons** | ^5.5.0 | Icon components |
 | **Lucide React** | ^0.408.0 | UI icons |
 | **Axios** | (via API service) | HTTP client |
-
 ### **Additional Tools**
 - **Git** - Version control
 - **ESLint** - Code linting
 - **Jest** - Testing framework (backend)
-
 ---
-
 ## ✨ Features
-
 ### **Expense Management**
 - ✅ Add, edit, and delete expenses
 - ✅ Categorize expenses (Food, Transport, Utilities, etc.)
@@ -82,7 +87,6 @@ A modern, full-stack financial expense management application built with **React
 - ✅ Automatic expense extraction from receipts
 - ✅ Bulk upload capabilities
 - ✅ Receipt storage and retrieval
-
 ### **Analytics & Reporting**
 - ✅ Interactive spending charts and graphs
 - ✅ Category-wise expense breakdown
@@ -93,7 +97,6 @@ A modern, full-stack financial expense management application built with **React
 - ✅ Set budget limits per category
 - ✅ Budget vs actual spending comparison
 - ✅ Budget alerts and notifications
-
 ### **Authentication & Security**
 - ✅ Secure JWT-based authentication
 - ✅ Clerk integration for modern auth flows

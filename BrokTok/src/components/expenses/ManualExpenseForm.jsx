@@ -28,20 +28,29 @@ export default function ManualExpenseForm({ onSuccess }) {
 
 	const loadCategories = async () => {
 		try {
-			const res = await api.getCategories(getToken)
-			const cats = res?.categories || res?.data || [
-				'Food & Dining',
-				'Transportation',
-				'Shopping',
-				'Entertainment',
-				'Bills & Utilities',
-				'Health & Fitness',
-				'Education',
-				'Other'
-			]
+			console.log('📍 [ManualExpenseForm.loadCategories] Starting...')
+			const token = await getToken()  // ✅ Await token first
+			console.log('🔑 [ManualExpenseForm.loadCategories] Got token?', !!token, 'length:', token?.length || 0)
+			
+			if (!token) {
+				console.warn('⚠️  [ManualExpenseForm.loadCategories] No auth token available')
+				return
+			}
+			console.log('📤 [ManualExpenseForm.loadCategories] Calling api.getCategories...')
+			const res = await api.getCategories(token)  // ✅ Pass resolved token
+			console.log('📥 [ManualExpenseForm.loadCategories] API response:', res)
+			
+			const rawCats = res?.data?.categories || res?.categories || []
+			const cats = Array.isArray(rawCats) && rawCats.length > 0
+				? rawCats.map((cat) =>
+					typeof cat === 'string'
+						? { _id: cat, name: cat }
+						: { _id: cat._id || cat.id || cat.name, name: cat.name || cat }
+				)
+				: []
 			setCategories(cats)
 		} catch (err) {
-			console.error('Failed to load categories:', err)
+			console.error('❌ [ManualExpenseForm.loadCategories] Failed to load categories:', err)
 			setCategories([
 				'Food & Dining',
 				'Transportation',
@@ -86,7 +95,7 @@ export default function ManualExpenseForm({ onSuccess }) {
 			await addExpense({
 				description: formData.description.trim(),
 				amount: parseFloat(formData.amount),
-				category: formData.category,
+				categoryId: formData.category,
 				date: formData.date
 			})
 			console.log('Expense added successfully')
@@ -188,7 +197,7 @@ export default function ManualExpenseForm({ onSuccess }) {
 								>
 									<option value="" className="bg-gray-900">Select a category</option>
 									{categories.map(cat => (
-										<option key={cat} value={cat} className="bg-gray-900">
+										<option key={cat._id || cat} value={cat._id || cat} className="bg-gray-900">
 											{typeof cat === 'string' ? cat : cat.name}
 										</option>
 									))}

@@ -1,10 +1,8 @@
 import mongoose from "mongoose";
-
 const ExpenseSchema = new mongoose.Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,
       required: true,
     },
     categoryId: {
@@ -53,5 +51,4 @@ const ExpenseSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-
 export const Expense = mongoose.model("Expense", ExpenseSchema);

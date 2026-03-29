@@ -22,19 +22,15 @@ function LoadingPage() {
     </div>
   )
 }
-
 // Auth pages using Clerk
 function LoginPage() {
   const { isSignedIn, loading } = useAuth()
-  
   if (loading) {
     return <LoadingPage />
   }
-
   if (isSignedIn) {
     return <Navigate to="/dashboard" replace />
   }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
@@ -53,18 +49,14 @@ function LoginPage() {
     </div>
   )
 }
-
 function SignUpPage() {
   const { isSignedIn, loading } = useAuth()
-
   if (loading) {
     return <LoadingPage />
   }
-
   if (isSignedIn) {
     return <Navigate to="/dashboard" replace />
   }
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
@@ -83,7 +75,6 @@ function SignUpPage() {
     </div>
   )
 }
-
 export default function App() {
   const { loading: authLoading } = useAuth()
 
