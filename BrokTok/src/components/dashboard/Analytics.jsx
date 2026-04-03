@@ -8,13 +8,12 @@ import Sidebar from "../common/Sidebar";
 import useAuth from "../../hooks/useAuth";
 import * as api from "../../services/api";
 import { useNavigate } from "react-router-dom";
-
 // ─── Color palette (matches dashboard's indigo/violet accent tones) ────────────
 const CAT_COLORS = ["#6366f1","#8b5cf6","#a78bfa","#c084fc","#e879f9","#f472b6"];
-
 async function fetchAnalytics(range = 'month', token) {
   try {
     const res = await api.getAnalytics(range, token)
+    console.log("ANALYTICS DATA:", res);
     if (res?.error) throw new Error(res.error)
     return res?.data || res || {}
   } catch (err) {
@@ -64,7 +63,6 @@ const shimmerStyle = {
   animation: "shimmer 1.4s infinite",
   borderRadius: 6,
 };
-
 function StatCardSkeleton() {
   return (
     <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-3">
@@ -75,7 +73,6 @@ function StatCardSkeleton() {
     </div>
   );
 }
-
 function ChartSkeleton({ height = 256 }) {
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 7, height }}>
@@ -165,6 +162,7 @@ export default function AnalyticsPage() {
       badge: stats?.savingsRate >= 20 ? "green" : "gray",
       badgeText: stats?.savingsRate >= 20 ? "▲ Excellent!" : "Keep saving",
     },
+    
   ];
 
   return (

@@ -6,7 +6,7 @@ import Sidebar from '../common/Sidebar';
 import { useNavigate } from "react-router-dom";
 import * as api from '../../services/api';
 import CreateExpenseFromReceiptModal from './CreateExpenseFromReceiptModal';
-
+import sidebar from "../common/Sidebar"
 function ReceiptGallery() {
   const [receipts, setReceipts] = useState([]);
   const [search, setSearch] = useState("");
@@ -215,7 +215,9 @@ function ReceiptGallery() {
 
   return (
     <div className="bg-white rounded-2xl border shadow-sm p-6">
-
+    <div>
+      <Sidebar/>
+    </div>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
         <h2 className="text-lg font-semibold text-gray-800">

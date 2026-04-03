@@ -5,12 +5,12 @@ import { ErrorBoundary } from './components/common/ErrorBoundary'
 import Dashboard from './components/dashboard/Dashboard'
 import Uploads from './components/dashboard/Uploads'
 import Analytics from './components/dashboard/Analytics'
-import Settings from './components/dashboard/Settings'
+import ProfilePage from './components/dashboard/Settings'
 import Help from './components/dashboard/Help'
 import ProtectedRoute from './components/common/ProtectedRoute'
 import ManualExpenseForm from './components/expenses/ManualExpenseForm'
 import useAuth from './hooks/useAuth'
-
+import ReceiptGallery from "./components/dashboard/Uploads.fixed"
 // Loading component
 function LoadingPage() {
   return (
@@ -101,7 +101,7 @@ export default function App() {
             path="/uploads"
             element={
               <ProtectedRoute>
-                <Uploads />
+                <ReceiptGallery />
               </ProtectedRoute>
             }
           />
@@ -117,7 +117,7 @@ export default function App() {
             path="/settings"
             element={
               <ProtectedRoute>
-                <Settings />
+                <ProfilePage />
               </ProtectedRoute>
             }
           />
