@@ -13,14 +13,11 @@
  * Dependencies:
  *   npm install @clerk/clerk-react lucide-react
  */
-
 import { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/clerk-react";
 import { LogOut, Lock, Mail, User, Settings as SettingsIcon, Smartphone, Trash2, ExternalLink } from "lucide-react";
 import Sidebar from "../common/Sidebar";
-
 // ─── Utility ────────────────────────────────────────────────────────────────
-
 function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
@@ -46,9 +43,7 @@ function Skeleton({ className }) {
     />
   );
 }
-
 // ─── Badge ───────────────────────────────────────────────────────────────────
-
 function Badge({ children, color = "zinc" }) {
   const colors = {
     zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
@@ -126,10 +121,7 @@ function Toast({ message, type }) {
     </div>
   );
 }
-
-
 // ─── Profile Card ────────────────────────────────────────────────────────────
-
 function ProfileCard({ user, isLoaded }) {
   return (
     <Card className="flex items-center gap-5">
@@ -150,7 +142,6 @@ function ProfileCard({ user, isLoaded }) {
             )}
             <span className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 dark:border-zinc-900" />
           </div>
-
           {/* Info */}
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -181,9 +172,7 @@ function ProfileCard({ user, isLoaded }) {
     </Card>
   );
 }
-
 // ─── Edit Profile Form ────────────────────────────────────────────────────────
-
 function EditProfileForm({ user, isLoaded }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -345,7 +334,6 @@ function EditProfileForm({ user, isLoaded }) {
   );
 }
 // ─── Dark Mode Toggle ─────────────────────────────────────────────────────────
-
 function DarkModeToggle({ dark, onToggle }) {
   return (
     <button
@@ -363,7 +351,6 @@ function DarkModeToggle({ dark, onToggle }) {
   );
 }
 // ─── Root ─────────────────────────────────────────────────────────────────────
-
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
   const [active, setActive] = useState("profile");
