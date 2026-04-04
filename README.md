@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-
-=======
+======
 # 💰 Kharcha-Core: Full-Stack Expense Tracking Application
->>>>>>> 37e43dd (Adding A Better Backend Server Connectivity)
 A modern, full-stack financial expense management application built with **React** (frontend) and **Node.js/Express** (backend). Designed to help users track expenses, manage budgets, and gain financial insights through intuitive interfaces and AI-powered chatbot assistance.
 **Live Repository:** [Financcino on GitHub](https://github.com/Ramesh1234-ai/Financcino)
 ---
@@ -16,7 +13,6 @@ A modern, full-stack financial expense management application built with **React
 - [Installation & Setup](#installation--setup)
   - [Backend Setup](#backend-setup)
   - [Frontend Setup](#frontend-setup)
-<<<<<<< HEAD
 =======
 - [Environment Configuration](#environment-configuration)
 - [Running the Application](#running-the-application)
@@ -27,7 +23,6 @@ A modern, full-stack financial expense management application built with **React
 - [Security Notes](#security-notes)
 - [Contributing](#contributing)
 - [License](#license)
->>>>>>> 37e43dd (Adding A Better Backend Server Connectivity)
 ---
 ## 🎯 Overview
 **Kharcha-Core** is a comprehensive expense tracking system designed for personal finance management. The application enables users to:
