@@ -1,386 +1,409 @@
-/**
- * Settings.jsx - Complete Settings Page with Clerk Integration
- * 
- * Features:
- * - Profile management (name, avatar)
- * - Email management
- * - Security settings
- * - Preferences
- * - Account connected apps
- * - Session management
- * - Account deletion
- * 
- * Dependencies:
- *   npm install @clerk/clerk-react lucide-react
- */
 import { useState, useEffect } from "react";
 import { useUser, useClerk } from "@clerk/clerk-react";
-import { LogOut, Lock, Mail, User, Settings as SettingsIcon, Smartphone, Trash2, ExternalLink } from "lucide-react";
+import { LogOut, Lock, Mail, Smartphone, Trash2, Bell, Moon } from "lucide-react";
 import Sidebar from "../common/Sidebar";
-// ─── Utility ────────────────────────────────────────────────────────────────
-function cn(...classes) {
-  return classes.filter(Boolean).join(" ");
-}
+import { useNavigate } from "react-router-dom";
 
-function formatDate(dateStr) {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-// ─── Skeleton ────────────────────────────────────────────────────────────────
-
-function Skeleton({ className }) {
-  return (
-    <div
-      className={cn(
-        "animate-pulse rounded-lg bg-zinc-200 dark:bg-zinc-700",
-        className
-      )}
-    />
-  );
-}
-// ─── Badge ───────────────────────────────────────────────────────────────────
-function Badge({ children, color = "zinc" }) {
-  const colors = {
-    zinc: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300",
-    emerald:
-      "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-    sky: "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
-  };
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
-        colors[color]
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-// ─── Card ────────────────────────────────────────────────────────────────────
-
-function Card({ children, className }) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border border-zinc-200/80 bg-white p-6",
-        "shadow-sm shadow-zinc-100",
-        "dark:border-zinc-700/60 dark:bg-zinc-900 dark:shadow-zinc-900",
-        className
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-// ─── Section Header ──────────────────────────────────────────────────────────
-
-function SectionHeader({ title, description }) {
-  return (
-    <div className="mb-5">
-      <h2 className="text-sm font-semibold tracking-wide text-zinc-900 dark:text-zinc-100">
-        {title}
-      </h2>
-      {description && (
-        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-          {description}
-        </p>
-      )}
-    </div>
-  );
-}
-
-// ─── Toast ───────────────────────────────────────────────────────────────────
-
-function Toast({ message, type }) {
-  if (!message) return null;
-  const styles = {
-    success:
-      "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-300",
-    error:
-      "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-700 dark:text-red-300",
-  };
-  const icons = { success: "✓", error: "✕" };
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium",
-        "transition-all duration-300",
-        styles[type]
-      )}
-    >
-      <span className="text-base leading-none">{icons[type]}</span>
-      {message}
-    </div>
-  );
-}
-// ─── Profile Card ────────────────────────────────────────────────────────────
-function ProfileCard({ user, isLoaded }) {
-  return (
-    <Card className="flex items-center gap-5">
-      {isLoaded ? (
-        <>
-          {/* Avatar */}
-          <div className="relative flex-shrink-0">
-            {user?.imageUrl ? (
-              <img
-                src={user.imageUrl}
-                alt={user.fullName || "Avatar"}
-                className="h-16 w-16 rounded-full object-cover ring-2 ring-white shadow-md dark:ring-zinc-800"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-xl font-bold text-white shadow-md">
-                {(user?.firstName?.[0] || user?.emailAddresses?.[0]?.emailAddress?.[0] || "U").toUpperCase()}
-              </div>
-            )}
-            <span className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-400 dark:border-zinc-900" />
-          </div>
-          {/* Info */}
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              {user?.fullName || "—"}
-            </h1>
-            <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">
-              {user?.primaryEmailAddress?.emailAddress || "—"}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Badge color="emerald">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Active
-              </Badge>
-              <Badge color="sky">Clerk Auth</Badge>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <Skeleton className="h-16 w-16 rounded-full flex-shrink-0" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-5 w-40" />
-            <Skeleton className="h-4 w-52" />
-            <Skeleton className="h-5 w-28 rounded-full" />
-          </div>
-        </>
-      )}
-    </Card>
-  );
-}
-// ─── Edit Profile Form ────────────────────────────────────────────────────────
-function EditProfileForm({ user, isLoaded }) {
+export default function SettingsPage() {
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+  const navigate = useNavigate();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState("profile");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState({ message: "", type: "" });
+  const [message, setMessage] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
+  const [emailNotifications, setEmailNotifications] = useState(true);
 
+  // Initialize form with user data
   useEffect(() => {
-    if (user) {
+    if (isLoaded && user) {
       setFirstName(user.firstName || "");
       setLastName(user.lastName || "");
     }
-  }, [user]);
+  }, [user, isLoaded]);
 
-  const showToast = (message, type) => {
-    setToast({ message, type });
-    setTimeout(() => setToast({ message: "", type: "" }), 4000);
-  };
-
-  const handleSave = async () => {
+  const handleSaveProfile = async () => {
     if (!user) return;
     setSaving(true);
+    setMessage("");
+
     try {
-      await user.update({ firstName: firstName.trim(), lastName: lastName.trim() });
-      showToast("Profile updated successfully.", "success");
-    } catch (err) {
-      showToast(err?.errors?.[0]?.message || "Failed to update profile.", "error");
+      await user.update({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+      });
+      setMessage({ text: "Profile updated successfully!", type: "success" });
+      setTimeout(() => setMessage(""), 3000);
+    } catch (error) {
+      setMessage({ text: "Failed to update profile: " + error.message, type: "error" });
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <Card>
-      <SectionHeader
-        title="Edit Profile"
-        description="Update your display name visible across your account."
-      />
+  const handleLogout = async () => {
+    if (window.confirm("Are you sure you want to sign out?")) {
+      await signOut();
+      navigate("/");
+    }
+  };
 
-      {isLoaded ? (
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                First Name
-              </label>
-              <input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="First name"
-                className={cn(
-                  "w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm",
-                  "text-zinc-900 placeholder-zinc-400 outline-none",
-                  "transition-all focus:border-zinc-400 focus:bg-white focus:ring-2 focus:ring-zinc-200",
-                  "dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500",
-                  "dark:focus:border-zinc-500 dark:focus:bg-zinc-750 dark:focus:ring-zinc-700"
-                )}
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                Last Name
-              </label>
-              <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Last name"
-                className={cn(
-                  "w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-sm",
-                  "text-zinc-900 placeholder-zinc-400 outline-none",
-                  "transition-all focus:border-zinc-400 focus:bg-white focus:ring-2 focus:ring-zinc-200",
-                  "dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500",
-                  "dark:focus:border-zinc-500 dark:focus:bg-zinc-750 dark:focus:ring-zinc-700"
-                )}
-              />
-            </div>
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "⚠️  This will permanently delete your account and all data. This cannot be undone.\n\nType your email to confirm."
+    );
+    
+    if (confirmed) {
+      const email = prompt("Enter your email address to confirm deletion:");
+      if (email === user?.primaryEmailAddress?.emailAddress) {
+        try {
+          await user.delete();
+          navigate("/");
+        } catch (error) {
+          alert("Error deleting account: " + error.message);
+        }
+      } else {
+        alert("Email does not match. Account deletion cancelled.");
+      }
+    }
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-100 dark:bg-slate-900">
+        <div className="text-center">
+          <div className="animate-spin mb-4">
+            <svg className="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
           </div>
+          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-              Email Address
-            </label>
-            <input
-              type="email"
-              value={user?.primaryEmailAddress?.emailAddress || ""}
-              readOnly
-              className={cn(
-                "w-full rounded-xl border border-zinc-200 bg-zinc-100 px-3.5 py-2.5 text-sm",
-                "cursor-not-allowed text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-500"
-              )}
-            />
-            <p className="mt-1 text-[11px] text-zinc-400 dark:text-zinc-500">
-              Email changes must be done through the security panel.
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Sidebar */}
+      <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+
+      {/* Main Content */}
+      <main className={`transition-all duration-300 ${isCollapsed ? "ml-0" : "ml-0 md:ml-64"}`}>
+        <div className="max-w-5xl mx-auto px-4 py-8 md:px-6 md:py-12">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-slate-50 mb-2">
+              Settings
+            </h1>
+            <p className="text-slate-600 dark:text-slate-400">
+              Manage your account preferences and security
             </p>
           </div>
 
-          {toast.message && <Toast message={toast.message} type={toast.type} />}
+          {/* Tabs */}
+          <div className="flex gap-4 mb-8 border-b border-slate-200 dark:border-slate-700 overflow-x-auto">
+            {["profile", "security", "preferences", "danger"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-3 font-medium text-sm transition-all border-b-2 whitespace-nowrap ${
+                  activeTab === tab
+                    ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                    : "border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-300"
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
 
-          <div className="flex items-center justify-end gap-3 pt-1">
-            <button
-              onClick={() => {
-                setFirstName(user?.firstName || "");
-                setLastName(user?.lastName || "");
-              }}
-              className="rounded-xl px-4 py-2 text-sm font-medium text-zinc-500 transition hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={cn(
-                "flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold",
-                "bg-zinc-900 text-white shadow-sm transition-all",
-                "hover:bg-zinc-700 active:scale-[0.98]",
-                "dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200",
-                "disabled:cursor-not-allowed disabled:opacity-50"
-              )}
-            >
-              {saving && (
-                <svg
-                  className="h-3.5 w-3.5 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v8H4z"
-                  />
-                </svg>
-              )}
-              {saving ? "Saving…" : "Save Changes"}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Skeleton className="h-10" />
-            <Skeleton className="h-10" />
-          </div>
-          <Skeleton className="h-10" />
-          <div className="flex justify-end">
-            <Skeleton className="h-9 w-32" />
-          </div>
-        </div>
-      )}
-    </Card>
-  );
-}
-// ─── Dark Mode Toggle ─────────────────────────────────────────────────────────
-function DarkModeToggle({ dark, onToggle }) {
-  return (
-    <button
-      onClick={onToggle}
-      className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-lg text-sm",
-        "border border-zinc-200 bg-white text-zinc-600 shadow-sm transition-all",
-        "hover:bg-zinc-50 hover:text-zinc-900",
-        "dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-      )}
-      title={dark ? "Switch to light mode" : "Switch to dark mode"}
-    >
-      {dark ? "☀️" : "🌙"}
-    </button>
-  );
-}
-// ─── Root ─────────────────────────────────────────────────────────────────────
-export default function ProfilePage() {
-  const { user, isLoaded } = useUser();
-  const [active, setActive] = useState("profile");
-  const [dark, setDark] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  // Apply dark mode
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
-  return (
-    <div className="min-h-screen bg-zinc-50 font-sans antialiased dark:bg-zinc-950">
-      {/* Desktop Sidebar */}
-      <div className="hidden sm:block">
-        <Sidebar/>
-      </div>
-      {/* Main Content */}
-      <main className="sm:pl-60">
-        <div className="mx-auto max-w-2xl px-5 py-8">
-          {/* Desktop header */}
-          <div className="mb-7 hidden items-center justify-between sm:flex">
-            <div>
-              <h1 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                {navItems.find((n) => n.id === active)?.label}
-              </h1>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Manage your {navItems.find((n) => n.id === active)?.label.toLowerCase()} settings
-              </p>
+          {/* Profile Tab */}
+          {activeTab === "profile" && (
+            <div className="space-y-6">
+              {/* Avatar Card */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50 mb-4">
+                  Profile Picture
+                </h2>
+                <div className="flex items-center gap-6">
+                  {user?.imageUrl ? (
+                    <img
+                      src={user.imageUrl}
+                      alt="Avatar"
+                      className="h-20 w-20 rounded-full object-cover border-2 border-indigo-200"
+                    />
+                  ) : (
+                    <div className="h-20 w-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
+                      {user?.firstName?.[0] || user?.primaryEmailAddress?.emailAddress?.[0] || "U"}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-slate-600 dark:text-slate-400 mb-2">
+                      Your avatar is powered by your email
+                    </p>
+                    <a
+                      href="https://gravatar.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium"
+                    >
+                      Update on Gravatar →
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Edit Profile Card */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50 mb-4">
+                  Personal Information
+                </h2>
+                <div className="space-y-4">
+                  {/* First Name */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white dark:bg-slate-700 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Enter your first name"
+                    />
+                  </div>
+
+                  {/* Last Name */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                      Last Name
+                    </label>
+                    <input
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-white dark:bg-slate-700 dark:border-slate-600 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Enter your last name"
+                    />
+                  </div>
+
+                  {/* Email (Read-only) */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 uppercase tracking-wide">
+                      Email Address
+                    </label>
+                    <div className="px-4 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400">
+                      {user?.primaryEmailAddress?.emailAddress || "—"}
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">
+                      Email changes must be done through Clerk dashboard
+                    </p>
+                  </div>
+
+                  {/* Status Message */}
+                  {message && (
+                    <div
+                      className={`p-3 rounded-lg text-sm font-medium ${
+                        message.type === "success"
+                          ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800"
+                          : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800"
+                      }`}
+                    >
+                      {message.text}
+                    </div>
+                  )}
+
+                  {/* Save Button */}
+                  <div className="flex justify-end gap-3 pt-4">
+                    <button
+                      onClick={() => {
+                        setFirstName(user?.firstName || "");
+                        setLastName(user?.lastName || "");
+                      }}
+                      className="px-4 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium text-sm transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={saving}
+                      className="px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {saving && <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>}
+                      {saving ? "Saving..." : "Save Changes"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <DarkModeToggle dark={dark} onToggle={() => setDark((d) => !d)} />
-          </div>
+          )}
+
+          {/* Security Tab */}
+          {activeTab === "security" && (
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50 mb-4">
+                  Security Settings
+                </h2>
+                <div className="space-y-4">
+                  {/* Password */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <Lock className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">Password</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Last changed 3 months ago</p>
+                      </div>
+                    </div>
+                    <button className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium transition">
+                      Change
+                    </button>
+                  </div>
+
+                  {/* Two Factor */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <Smartphone className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">Two-Factor Authentication</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Not enabled</p>
+                      </div>
+                    </div>
+                    <button className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm font-medium transition">
+                      Enable
+                    </button>
+                  </div>
+
+                  {/* Active Sessions */}
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                    <p className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-3 uppercase tracking-wide">
+                      Active Sessions
+                    </p>
+                    <div className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-slate-900 dark:text-slate-100">This Browser</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">Chrome on Windows • Last active now</p>
+                        </div>
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sign Out Button */}
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-medium text-sm transition"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Preferences Tab */}
+          {activeTab === "preferences" && (
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50 mb-4">
+                  Notification Preferences
+                </h2>
+                <div className="space-y-4">
+                  {/* Email Notifications */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <Mail className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">Email Notifications</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Receive alerts and reports</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={emailNotifications}
+                        onChange={(e) => setEmailNotifications(e.target.checked)}
+                        className="w-5 h-5 accent-indigo-600"
+                      />
+                    </label>
+                  </div>
+
+                  {/* SMS Notifications */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <Bell className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">SMS Notifications</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Get SMS for large expenses</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center">
+                      <input type="checkbox" className="w-5 h-5 accent-indigo-600" />
+                    </label>
+                  </div>
+
+                  {/* Dark Mode */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <Moon className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">Dark Mode</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Better for your eyes</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={darkMode}
+                        onChange={(e) => setDarkMode(e.target.checked)}
+                        className="w-5 h-5 accent-indigo-600"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Danger Tab */}
+          {activeTab === "danger" && (
+            <div className="space-y-6">
+              <div className="bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-900 p-6">
+                <h2 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-4">
+                  Danger Zone
+                </h2>
+                <p className="text-sm text-red-800 dark:text-red-300 mb-6">
+                  These actions are irreversible. Proceed with extreme caution.
+                </p>
+
+                {/* Delete Account */}
+                <div className="flex items-center justify-between p-4 bg-white dark:bg-red-950/30 rounded-lg border border-red-300 dark:border-red-900">
+                  <div className="flex items-center gap-3">
+                    <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-slate-100">Delete Account</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Permanently remove your account and data</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleDeleteAccount}
+                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium text-sm transition"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

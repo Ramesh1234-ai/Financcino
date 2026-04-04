@@ -11,6 +11,7 @@ import ProtectedRoute from './components/common/ProtectedRoute'
 import ManualExpenseForm from './components/expenses/ManualExpenseForm'
 import useAuth from './hooks/useAuth'
 import ReceiptGallery from "./components/dashboard/Uploads.fixed"
+import SettingsPage from './components/dashboard/Settings'
 // Loading component
 function LoadingPage() {
   return (
@@ -117,7 +118,7 @@ export default function App() {
             path="/settings"
             element={
               <ProtectedRoute>
-                <ProfilePage />
+                <SettingsPage />
               </ProtectedRoute>
             }
           />
