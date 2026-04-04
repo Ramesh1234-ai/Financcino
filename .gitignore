@@ -108,3 +108,6 @@ BrokTok/.vite/
 *.sqlite
 *.sqlite3
 .vercel
+
+#file
+a.txt

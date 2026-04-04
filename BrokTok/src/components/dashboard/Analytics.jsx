@@ -8,14 +8,34 @@ import Sidebar from "../common/Sidebar";
 import useAuth from "../../hooks/useAuth";
 import * as api from "../../services/api";
 import { useNavigate } from "react-router-dom";
+
 // ─── Color palette (matches dashboard's indigo/violet accent tones) ────────────
 const CAT_COLORS = ["#6366f1","#8b5cf6","#a78bfa","#c084fc","#e879f9","#f472b6"];
+
+/**
+ * Fetch analytics with proper error handling
+ * Now handles the new response format from backend
+ */
 async function fetchAnalytics(range = 'month', token) {
   try {
     const res = await api.getAnalytics(range, token)
     console.log("ANALYTICS DATA:", res);
-    if (res?.error) throw new Error(res.error)
-    return res?.data || res || {}
+    
+    if (res?.error) {
+      throw new Error(res.error)
+    }
+    
+    if (!res?.data) {
+      throw new Error('No data returned from analytics endpoint')
+    }
+    
+    // Validate required fields
+    const data = res.data;
+    if (!data.stats || !data.categories || !data.trend) {
+      throw new Error('Invalid analytics response structure')
+    }
+    
+    return data;
   } catch (err) {
     console.error('fetchAnalytics error:', err)
     throw err
@@ -131,38 +151,41 @@ export default function AnalyticsPage() {
   }, [range, getToken]);
 
   useEffect(() => { loadData(); }, [loadData]);
-  const stats = data?.stats;
+  
+  // Extract stats safely with defaults
+  const stats = data?.stats || {};
   const totalCategories = data?.categories?.reduce((s, c) => s + c.value, 0) || 1;
+  
+  // Build stat cards - removed savingsRate since no income model exists
   const statCards = [
     {
-      label: "AVERAGE MONTHLY SPEND",
-      value: `₹${stats?.avgSpend?.toLocaleString() ?? "—"}`,
-      sub: "Per month average",
+      label: "TOTAL SPENT",
+      value: `₹${stats?.totalSpent?.toLocaleString() ?? "—"}`,
+      sub: "This period",
       badge: "gray",
-      badgeText: "This period",
+      badgeText: stats?.totalSpent > 0 ? `${stats?.transactionCount || 0} transactions` : "No expenses",
+    },
+    {
+      label: "AVERAGE SPEND",
+      value: `₹${stats?.avgSpend?.toLocaleString() ?? "—"}`,
+      sub: "Per transaction",
+      badge: "gray",
+      badgeText: stats?.avgSpend > 500 ? "▲ High" : "▼ Reasonable",
     },
     {
       label: "BUDGET REMAINING",
       value: `₹${stats?.budgetRemaining?.toLocaleString() ?? "—"}`,
       sub: "Left this period",
-      badge: stats?.budgetRemaining > 0 ? "green" : "gray",
-      badgeText: stats?.budgetRemaining > 0 ? "▲ On track" : "▼ Over budget",
+      badge: stats?.budgetRemaining > 0 ? "green" : "red",
+      badgeText: stats?.budgetRemaining > 0 ? "✓ On track" : "✗ Over budget",
     },
     {
-      label: "HIGHEST CATEGORY",
+      label: "TOP CATEGORY",
       value: stats?.topCategory ?? "—",
-      sub: "Top spending category",
+      sub: "Highest spending",
       badge: "gray",
       badgeText: "Dominant",
     },
-    {
-      label: "SAVINGS RATE",
-      value: `${stats?.savingsRate ?? 0}%`,
-      sub: "Of income saved",
-      badge: stats?.savingsRate >= 20 ? "green" : "gray",
-      badgeText: stats?.savingsRate >= 20 ? "▲ Excellent!" : "Keep saving",
-    },
-    
   ];
 
   return (
@@ -228,7 +251,6 @@ export default function AnalyticsPage() {
                   className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm
                     hover:shadow-md hover:border-gray-300 transition-all duration-200"
                 >
-                  {/* matches dashboard "TOTAL SPENT" uppercase label style exactly */}
                   <p className="text-[11px] font-semibold tracking-widest uppercase text-gray-400 mb-2">
                     {s.label}
                   </p>
@@ -236,7 +258,11 @@ export default function AnalyticsPage() {
                   <p className="text-xs text-gray-400 mt-1">{s.sub}</p>
                   <span
                     className={`inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full mt-3
-                      ${s.badge === "green" ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-500"}`}
+                      ${s.badge === "green" 
+                        ? "bg-emerald-50 text-emerald-600" 
+                        : s.badge === "red"
+                        ? "bg-red-50 text-red-600"
+                        : "bg-gray-100 text-gray-500"}`}
                   >
                     {s.badgeText}
                   </span>
@@ -257,13 +283,17 @@ export default function AnalyticsPage() {
               </p>
               {loading ? (
                 <ChartSkeleton height={252} />
+              ) : !data?.trend || data.trend.length === 0 ? (
+                <div className="flex items-center justify-center h-64 text-gray-400">
+                  <p>No expense data for this period</p>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={252}>
-                  <BarChart data={data?.trend} barGap={3} barCategoryGap="30%">
+                  <BarChart data={data.trend} barGap={3} barCategoryGap="30%">
                     <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                     <XAxis dataKey="label" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false}
-                      tickFormatter={(v) => `$${v >= 1000 ? `${v / 1000}k` : v}`} />
+                      tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`} />
                     <Tooltip content={<ChartTooltip />} cursor={{ fill: "#fafafa" }} />
                     <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }}
                       formatter={(v) => <span style={{ color: "#6b7280", textTransform: "capitalize" }}>{v}</span>} />
@@ -285,18 +315,22 @@ export default function AnalyticsPage() {
                 <div className="flex items-center justify-center h-40">
                   <div style={{ ...shimmerStyle, width: 130, height: 130, borderRadius: "50%" }} />
                 </div>
+              ) : !data?.categories || data.categories.length === 0 ? (
+                <div className="flex items-center justify-center h-40 text-gray-400">
+                  <p>No categories found</p>
+                </div>
               ) : (
                 <ResponsiveContainer width="100%" height={170}>
                   <PieChart>
                     <Pie
-                      data={data?.categories}
+                      data={data.categories}
                       cx="50%" cy="50%"
                       innerRadius={44} outerRadius={74}
                       paddingAngle={3} dataKey="value"
                       labelLine={false} label={PieLabel}
                       animationDuration={700}
                     >
-                      {data?.categories?.map((_, i) => (
+                      {data.categories.map((_, i) => (
                         <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
                       ))}
                     </Pie>
@@ -306,23 +340,23 @@ export default function AnalyticsPage() {
               )}
 
               {/* Category list */}
-              {!loading && (
+              {!loading && data?.categories && data.categories.length > 0 && (
                 <div className="mt-3 space-y-2">
-                  {data?.categories?.slice(0, 5).map((c, i) => (
+                  {data.categories.slice(0, 5).map((c, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
                           className="w-2 h-2 rounded-sm flex-shrink-0"
                           style={{ background: CAT_COLORS[i % CAT_COLORS.length] }}
                         />
-                        <span className="text-xs text-gray-600">{c.name}</span>
+                        <span className="text-xs text-gray-600 capitalize">{c.name}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] text-gray-400">
                           {((c.value / totalCategories) * 100).toFixed(0)}%
                         </span>
                         <span className="text-xs font-semibold text-gray-900 font-mono">
-                          ${c.value.toLocaleString()}
+                          ₹{c.value.toLocaleString()}
                         </span>
                       </div>
                     </div>
@@ -342,9 +376,13 @@ export default function AnalyticsPage() {
             </p>
             {loading ? (
               <ChartSkeleton height={212} />
+            ) : !data?.spendingTrend || data.spendingTrend.length === 0 ? (
+              <div className="flex items-center justify-center h-52 text-gray-400">
+                <p>No spending data to display</p>
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height={212}>
-                <AreaChart data={data?.spendingTrend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <AreaChart data={data.spendingTrend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="indigoGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#6366f1" stopOpacity={0.15} />
@@ -354,7 +392,7 @@ export default function AnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={false} tickLine={false}
-                    tickFormatter={(v) => `$${v >= 1000 ? `${v / 1000}k` : v}`} />
+                    tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`} />
                   <Tooltip content={<ChartTooltip />} cursor={{ stroke: "#e5e7eb", strokeWidth: 1 }} />
                   <Area
                     type="monotone" dataKey="amount"

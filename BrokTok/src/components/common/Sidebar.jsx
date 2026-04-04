@@ -87,6 +87,7 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, onLogout }) => {
             <LogOut size={16} />
             Logout
           </button>
+          <UserAvatar/>
         </div>
       </aside>
     </>

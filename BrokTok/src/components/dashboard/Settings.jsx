@@ -1,18 +1,22 @@
 /**
- * ProfilePage.jsx
+ * Settings.jsx - Complete Settings Page with Clerk Integration
  * 
- * SaaS-style Profile Page with Clerk authentication.
+ * Features:
+ * - Profile management (name, avatar)
+ * - Email management
+ * - Security settings
+ * - Preferences
+ * - Account connected apps
+ * - Session management
+ * - Account deletion
  * 
  * Dependencies:
- *   npm install @clerk/clerk-react
- * 
- * Usage:
- *   Wrap your app with <ClerkProvider publishableKey="...">
- *   Then render <ProfilePage /> inside a <SignedIn> guard.
+ *   npm install @clerk/clerk-react lucide-react
  */
 
 import { useState, useEffect } from "react";
-import { useUser, UserButton, useClerk } from "@clerk/clerk-react";
+import { useUser, useClerk } from "@clerk/clerk-react";
+import { LogOut, Lock, Mail, User, Settings as SettingsIcon, Smartphone, Trash2, ExternalLink } from "lucide-react";
 import Sidebar from "../common/Sidebar";
 
 // ─── Utility ────────────────────────────────────────────────────────────────
