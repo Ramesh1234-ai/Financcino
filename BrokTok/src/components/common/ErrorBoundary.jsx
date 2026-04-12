@@ -1,8 +1,8 @@
 // BrokTok/src/components/common/ErrorBoundary.jsx
-import React from 'react'
+import { Component } from 'react'
 import { AlertCircle } from 'lucide-react'
 
-export class ErrorBoundary extends React.Component {
+export class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
     this.state = {

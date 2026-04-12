@@ -1,4 +1,3 @@
-import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { UserButton,UserAvatar } from "@clerk/clerk-react";
 import { LayoutDashboard, BarChart2, Settings, Upload, HelpCircle, LogOut } from "lucide-react";

@@ -1,5 +1,4 @@
 // BrokTok/src/components/common/Toast.jsx
-import React from 'react'
 import { AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react'
 
 export function Toast({ message, type = 'info', onDismiss }) {
