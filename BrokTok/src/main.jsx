@@ -4,7 +4,7 @@ import './index.css'
 import App from './App'
 import { AuthProvider } from './context/AuthContext'
 import { ClerkProvider } from '@clerk/clerk-react'
-import React from "react";
+
 // Get Clerk publishable key from environment
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
