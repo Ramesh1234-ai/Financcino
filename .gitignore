@@ -102,12 +102,18 @@ Backend/logs/
 # Frontend specific (BrokTok)
 BrokTok/dist/
 BrokTok/.vite/
-
+BrokTok/node_modules/
+#Backend Specfic(Backend)
+Backend/node_modules/
+Backend/eng.traineddata
+Backend/test-analytics-post.sh
+Backend/test-routes.sh
+Backend/.env
 # Database
 *.db
 *.sqlite
 *.sqlite3
 .vercel
-
+docs/
 #file
 a.txt
