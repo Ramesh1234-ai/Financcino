@@ -5,7 +5,6 @@ import { config } from '../config/config.js';
 import { Expense } from '../models/expense.models.js';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || 'AIzaSyDF_ObJ32jYnn-PRf0S4K-HuzkU-RgWB9U');
-
 /**
  * Enhanced chatbot with expense context
  */
