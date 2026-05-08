@@ -1,3 +1,5 @@
+import React from 'react';
+
 export default function MessageBubble({ msg }) {
   const isUser = msg.sender === "user";
 

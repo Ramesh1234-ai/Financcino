@@ -53,27 +53,18 @@ export default function Help() {
       answer: 'The AI-powered chatbot can answer your questions about expense tracking, provide spending insights, and suggest ways to save money.'
     },
   ];
-
   const contactMethods = [
     {
       icon: FaEnvelope,
       title: 'Email Support',
-      detail: 'support@expensetrack.com',
+      detail: 'donordojo@gmail.com',
       description: 'Response time: 24 hours',
     },
-    {
-      icon: FaPhone,
-      title: 'Phone Support',
-      detail: '+1 (555) 123-4567',
-      description: 'Available Mon-Fri, 9AM-6PM EST',
-    },
   ];
-
   const filteredFaqs = faqItems.filter(item =>
     item.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.answer.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
   return (
     <div className="flex min-h-screen bg-white">
       {/* Sidebar */}
