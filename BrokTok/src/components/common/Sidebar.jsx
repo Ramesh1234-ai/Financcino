@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { UserButton,UserAvatar } from "@clerk/clerk-react";
+import { UserButton, UserAvatar } from "@clerk/clerk-react";
+import { Helmet } from "react-helmet";
 import { LayoutDashboard, BarChart2, Settings, Upload, HelpCircle, LogOut } from "lucide-react";
 const Sidebar = ({ isCollapsed, setIsCollapsed, onLogout }) => {
   const navigate = useNavigate();
@@ -15,24 +16,20 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, onLogout }) => {
       {/* Toggle Button */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className={`fixed top-5 z-50 w-9 h-9 rounded-lg bg-base-200 border border-base-300 flex items-center justify-center transition-all duration-300 shadow-md ${
-          isCollapsed ? "left-3" : "left-64"
-        }`}
+        className={`fixed top-5 z-50 w-9 h-9 rounded-lg bg-base-200 border border-base-300 flex items-center justify-center transition-all duration-300 shadow-md ${isCollapsed ? "left-3" : "left-64"
+          }`}
       >
         {isCollapsed ? "→" : "←"}
       </button>
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-full w-64 bg-base-100 border-r border-base-300 p-5 flex flex-col transition-transform duration-300 z-40 ${
-          isCollapsed ? "-translate-x-full" : "translate-x-0"
-        }`}
+        className={`fixed top-0 left-0 h-full w-64 bg-base-100 border-r border-base-300 p-5 flex flex-col transition-transform duration-300 z-40 ${isCollapsed ? "-translate-x-full" : "translate-x-0"
+          }`}
       >
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center text-white font-bold">
-            🔴
-          </div>
-          <h1 className="text-lg font-bold">StreamX</h1>
+          <img src="/financino.svg" alt="Financino Logo" className="w-8 h-8" />
+          <h1 className="text-lg font-bold">Financino</h1>
         </div>
 
         {/* Navigation */}
@@ -44,11 +41,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, onLogout }) => {
               <button
                 key={i}
                 onClick={() => navigate(item.path)}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
-                  isActive
-                    ? "bg-primary text-primary-content"
-                    : "hover:bg-base-200"
-                }`}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${isActive
+                  ? "bg-primary text-primary-content"
+                  : "hover:bg-base-200"
+                  }`}
               >
                 {item.icon}
                 <span>{item.label}</span>
@@ -71,10 +67,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, onLogout }) => {
 
         {/* Footer */}
         <div className="mt-auto flex flex-col gap-3">
-          
+
           {/* User */}
           <div className="flex items-center gap-3 p-2 rounded-lg bg-base-200">
-            <UserButton />
+            <UserAvatar />
             <span className="text-sm">My Profile</span>
           </div>
 
@@ -86,7 +82,6 @@ const Sidebar = ({ isCollapsed, setIsCollapsed, onLogout }) => {
             <LogOut size={16} />
             Logout
           </button>
-          <UserAvatar/>
         </div>
       </aside>
     </>

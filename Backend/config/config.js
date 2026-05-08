@@ -14,7 +14,7 @@ export const config = {
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   // Security
   BCRYPT_ROUNDS: 10,
-  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  CORS_ORIGIN: process.env.CORS_ORIGIN || 'https://finverse-fin.vercel.app',
   // Logging
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   // Pagination

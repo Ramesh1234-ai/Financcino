@@ -103,6 +103,8 @@ Backend/logs/
 BrokTok/dist/
 BrokTok/.vite/
 BrokTok/node_modules/
+BrokTok/deployment-checklist.sh
+BrokTok/find-react-imports.sh
 #Backend Specfic(Backend)
 Backend/node_modules/
 Backend/eng.traineddata
