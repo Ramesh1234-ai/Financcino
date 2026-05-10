@@ -3,10 +3,12 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import helmet from 'helmet';
+import swaggerUi from 'swagger-ui-express';
 import logger from './utils/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { config } from './config/config.js';
+import swaggerSpec from './config/swagger.js';
 import authRoutes from './routes/auth.routes.js';
 import expenseRoutes from './routes/expenses.routes.js';
 import budgetRoutes from './routes/budgets.routes.js';
@@ -41,6 +43,20 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // Logging middleware
 app.use(requestLogger);
+
+// ==================== SWAGGER SETUP ====================
+// Serve Swagger UI at /api-docs
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  swaggerOptions: {
+    url: '/api-docs.json',
+  },
+}));
+
+// Serve swagger spec as JSON
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 
 // ==================== DATABASE CONNECTION ====================
 async function connectDB() {
@@ -117,6 +133,7 @@ async function startServer() {
         ✅ Server running in ${NODE_ENV} mode
         📍 Listening on port ${PORT}
         🌐 API Base URL: http://localhost:${PORT}/api
+        📚 Swagger UI: http://localhost:${PORT}/api-docs
         🏥 Health Check: http://localhost:${PORT}/api/health
         ❤️ Jwt Secret Key :${JWT_SECRET} 
         ========================================
