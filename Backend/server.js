@@ -29,19 +29,12 @@ const JWT_SECRET=config.JWT_SECRET;
 
 // Security middleware
 app.use(helmet()); // Set secure HTTP headers
-
 // CORS middleware - Support multiple origins in development
-const corsOrigins = NODE_ENV === 'production'
-  ? [config.CORS_ORIGIN]
-  : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000'];
-
 const corsOptions = {
-  origin: corsOrigins,
+  origin: "https://finan-cino.vercel.app",
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200, // For legacy browser support
-  maxAge: 3600, // Preflight cache time in seconds
 };
 
 app.use(cors(corsOptions));

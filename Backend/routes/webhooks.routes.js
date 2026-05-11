@@ -11,8 +11,7 @@ const router = express.Router();
  * 
  * Setup Instructions:
  * 1. Go to https://dashboard.clerk.com/last-active?path=webhooks
- * 2. Create a new webhook with URL: https://yourdomain.com/api/webhooks/clerk
- * http://localhost:3000/api/webhooks/clerk
+ * 2. Create a new webhook with URL: https://kharcha-api.vercel.app/api/webhooks/clerk
  * 3. Subscribe to events: user.created, user.updated, user.deleted
  * 4. Copy the signing secret and set CLERK_WEBHOOK_SECRET env variable
  */
