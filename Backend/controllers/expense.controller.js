@@ -87,7 +87,6 @@ export async function getExpenseById(req, res, next) {
 export async function updateExpense(req, res, next) {
   try {
     const { description, amount, categoryId, date, paymentMethod, tags, notes } = req.body;
-
     const expense = await Expense.findById(req.params.id);
     if (!expense) {
       throw new AppError('Expense not found', 404);

@@ -1,6 +1,13 @@
 import mongoose from "mongoose";
 const UserSchema = new mongoose.Schema(
   {
+    // Clerk authentication ID (for synced users)
+    clerkId: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true, // Allow null values for non-Clerk users
+    },
     fullName: {
       type: String,
       required: true,
@@ -22,7 +29,7 @@ const UserSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
+      default: null, // null for Clerk users
       minlength: 6,
       select: false, // Don't return password by default
     },

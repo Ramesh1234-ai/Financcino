@@ -16,6 +16,8 @@ import categoryRoutes from './routes/categories.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import chatbotRoutes from './routes/chatbot.routes.js';
 import receiptsRoutes from './routes/receipts.routes.js';
+import publicRoutes from './routes/public.routes.js';
+import webhookRoutes from './routes/webhooks.routes.js';
 // Load environment variables
 dotenv.config();
 const app = express();
@@ -28,16 +30,39 @@ const JWT_SECRET=config.JWT_SECRET;
 // Security middleware
 app.use(helmet()); // Set secure HTTP headers
 
-// CORS middleware
+// CORS middleware - Support multiple origins in development
+const corsOrigins = NODE_ENV === 'production'
+  ? [config.CORS_ORIGIN]
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000'];
+
 const corsOptions = {
-  origin: config.CORS_ORIGIN,
+  origin: corsOrigins,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200, // For legacy browser support
+  maxAge: 3600, // Preflight cache time in seconds
 };
+
 app.use(cors(corsOptions));
 
+// Additional CORS headers middleware as backup
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (corsOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  }
+  next();
+});
+
 // Body parsing middleware
+// For webhooks: capture raw body before JSON parsing for signature verification
+app.post('/api/webhooks/clerk', express.raw({ type: 'application/json' }));
+
+// Standard body parsing for other routes
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -88,7 +113,6 @@ async function connectDB() {
 }
 
 // ==================== ROUTES ====================
-
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
@@ -107,7 +131,10 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/chat', chatbotRoutes);
 app.use('/api/receipts', receiptsRoutes);
-
+// Public routes (no authentication required)
+app.use('/api/public', publicRoutes);
+// Webhook routes (Clerk user sync)
+app.use('/api/webhooks', webhookRoutes);
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
