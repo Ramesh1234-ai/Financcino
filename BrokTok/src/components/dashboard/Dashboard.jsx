@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import * as api from '../../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import ManualExpenseForm from '../expenses/ManualExpenseForm';
+import SavingsGoalModal from './SavingsGoalModal';
 // Header Component
 const Header = ({ userName, onAddExpense }) => {
   const [greeting, setGreeting] = useState('Good morning');
@@ -205,7 +206,7 @@ const CategoryBreakdown = ({ categories }) => {
   if (!categories || categories.length === 0) {
     return (
       <div className="bg-white/5 border border-white/10 p-5 rounded-xl backdrop-blur-md transition-all duration-300 hover:bg-white/8 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl shadow-lg">
-        <h2 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
+        <h2 className="text-black text-lg font-semibold mb-4 flex items-center gap-2">
           <span>📊</span>
           By Category
         </h2>
@@ -219,7 +220,7 @@ const CategoryBreakdown = ({ categories }) => {
 
   return (
     <div className="bg-white/5 border border-white/10 p-5 rounded-xl backdrop-blur-md transition-all duration-300 hover:bg-white/8 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl shadow-lg">
-      <h2 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
+      <h2 className="text-black text-lg font-semibold mb-4 flex items-center gap-2">
         <span>📊</span>
         By Category
       </h2>
@@ -235,7 +236,7 @@ const CategoryBreakdown = ({ categories }) => {
               className="flex justify-between items-center p-3 bg-white/3 rounded-lg border-l-4 border-indigo-500 transition-all duration-200 hover:bg-white/5"
             >
               <div>
-                <div className="text-white text-sm font-medium">{name}</div>
+                <div className="text-black text-sm font-medium">{name}</div>
                 <div className="text-black-400 text-xs">{count} transactions</div>
               </div>
               <div className="text-emerald-400 text-sm font-semibold">
@@ -251,6 +252,37 @@ const CategoryBreakdown = ({ categories }) => {
 
 // Recent Transactions Component
 const RecentTransactions = ({ transactions, isLoading }) => {
+  const formatTransactionDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diff = now - date;
+      // Less than 1 hour
+      if (diff < 60 * 60 * 1000) {
+        const minutes = Math.floor(diff / (60 * 1000));
+        return minutes === 0 ? 'Just now' : `${minutes}m ago`;
+      }
+      
+      // Less than 1 day
+      if (diff < 24 * 60 * 60 * 1000) {
+        const hours = Math.floor(diff / (60 * 60 * 1000));
+        return `${hours}h ago`;
+      }
+      
+      // Less than 7 days
+      if (diff < 7 * 24 * 60 * 60 * 1000) {
+        const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+        return `${days}d ago`;
+      }
+      
+      // Format as date
+      return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    } catch (err) {
+      return 'Invalid date';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="bg-white/5 border border-white/10 p-5 rounded-xl backdrop-blur-md transition-all duration-300 hover:bg-white/8 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl shadow-lg">
@@ -287,7 +319,7 @@ const RecentTransactions = ({ transactions, isLoading }) => {
 
   return (
     <div className="bg-white/5 border border-white/10 p-5 rounded-xl backdrop-blur-md transition-all duration-300 hover:bg-white/8 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl shadow-lg">
-      <h2 className="text-white text-lg font-semibold mb-4 flex items-center gap-2">
+      <h2 className="text-black text-lg font-semibold mb-4 flex items-center gap-2">
         <span>📋</span>
         Recent Transactions
       </h2>
@@ -296,6 +328,7 @@ const RecentTransactions = ({ transactions, isLoading }) => {
           const amount = parseFloat(transaction.amount) || 0
           const date = transaction.date || transaction.created_at || 'N/A'
           const category = transaction.category || 'Other'
+          const formattedDate = formatTransactionDate(date)
           
           return (
             <div
@@ -303,11 +336,11 @@ const RecentTransactions = ({ transactions, isLoading }) => {
               className="flex justify-between items-center p-3 bg-white/3 rounded-lg border-l-4 border-indigo-500 transition-all duration-200 hover:bg-white/5"
             >
               <div>
-                <div className="text-white text-sm font-medium">{date}</div>
+                <div className="text-black text-sm font-medium">{formattedDate}</div>
                 <div className="text-gray-400 text-xs">{category}</div>
               </div>
               <div className="text-emerald-400 text-sm font-semibold">
-                ${amount.toFixed(2)}
+                ₹{amount.toFixed(2)}
               </div>
             </div>
           )
@@ -321,6 +354,8 @@ const RecentTransactions = ({ transactions, isLoading }) => {
 const ExpenseTrackerDashboard = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [error, setError] = useState(null);
+  const [showSavingsModal, setShowSavingsModal] = useState(false);
+  const [savingsGoal, setSavingsGoal] = useState(0);
 
   const auth = useAuth()
   const navigate = useNavigate()
@@ -331,6 +366,13 @@ const ExpenseTrackerDashboard = () => {
     try {
       setError(null)
       await expenses.loadExpenses()
+      
+      // Load savings goal
+      const token = await auth.getToken()
+      const res = await api.getSavingsGoal(token)
+      if (res?.data?.savingsGoal) {
+        setSavingsGoal(res.data.savingsGoal)
+      }
     } catch (err) {
       console.error('Error fetching data:', err)
       setError(err.message || 'Failed to load expenses')
@@ -393,11 +435,18 @@ const ExpenseTrackerDashboard = () => {
               value={expenses.stats?.transactions || 0}
               isLoading={expenses.loading}
             />
-            <StatsCard
-              label="Savings Goal"
-              value={`₹${(expenses.stats?.savingsGoal || 0).toFixed(2)}`}
-              isLoading={expenses.loading}
-            />
+            <button
+              onClick={() => setShowSavingsModal(true)}
+              className="bg-white/5 border border-white/10 p-4 rounded-xl backdrop-blur-md transition-all duration-300 hover:bg-white/8 hover:border-white/20 hover:-translate-y-1 hover:shadow-xl shadow-lg cursor-pointer text-left"
+            >
+              <div className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                Savings Goal
+              </div>
+              <div className="text-black text-2xl font-bold">
+                ₹{(savingsGoal || 0).toFixed(2)}
+              </div>
+              <div className="text-gray-500 text-xs mt-1">Click to manage</div>
+            </button>
           </div>
 
           {/* Chart - Full Width on Mobile */}
@@ -444,6 +493,13 @@ const ExpenseTrackerDashboard = () => {
           background: rgba(255, 255, 255, 0.2);
         }
       `}</style>
+
+      {/* Savings Goal Modal */}
+      <SavingsGoalModal
+        isOpen={showSavingsModal}
+        onClose={() => setShowSavingsModal(false)}
+        onSavingsUpdated={() => fetchData()}
+      />
     </div>
   );
 };

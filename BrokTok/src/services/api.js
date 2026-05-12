@@ -1,6 +1,5 @@
 // Clerk token-based API service
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api'
-
 /**
  * Enhanced API call helper that supports Clerk authentication
  * @param {string} path - API endpoint path (e.g., '/expenses')
@@ -344,7 +343,6 @@ export async function createCategory(payload, token) {
 		body: JSON.stringify(payload),
 	}, token)
 }
-
 export async function updateCategory(id, payload, token) {
 	console.log('📂 [updateCategory] Updating category:', id)
 	return callApi(`/categories/${id}`, {
@@ -358,4 +356,61 @@ export async function deleteCategory(id, token) {
 		method: 'DELETE',
 	}, token)
 }
-export default { getExpenses, createExpense, updateExpense, deleteExpense, getAnalytics, getCategories, sendChatMessage, uploadReceipt, getReceipts, deleteReceipt }
+// ==================== BUDGET API ====================
+export async function getBudgets(token) {
+	console.log('💰 [getBudgets] Fetching budgets with token:', token ? '✓' : '✗')
+	return callApi('/budgets', {
+		method: 'GET',
+	}, token)
+}
+export async function createBudget(categoryId, budgetLimit, period = 'monthly', token) {
+	console.log('💰 [createBudget] Creating budget for category:', categoryId)
+	return callApi('/budgets', {
+		method: 'POST',
+		body: JSON.stringify({ categoryId, budgetLimit, period }),
+	}, token)
+}
+export async function updateBudget(id, payload, token) {
+	console.log('💰 [updateBudget] Updating budget:', id)
+	return callApi(`/budgets/${id}`, {
+		method: 'PUT',
+		body: JSON.stringify(payload),
+	}, token)
+}
+export async function deleteBudget(id, token) {
+	console.log('💰 [deleteBudget] Deleting budget:', id)
+	return callApi(`/budgets/${id}`, {
+		method: 'DELETE',
+	}, token)
+}
+
+// ==================== SAVINGS GOALS API ====================
+export async function getSavingsGoal(token) {
+	console.log('🎯 [getSavingsGoal] Fetching savings goal with token:', token ? '✓' : '✗')
+	return callApi('/savings-goals', {
+		method: 'GET',
+	}, token)
+}
+export async function setSavingsGoal(savingsGoal, currentSavings = 0, token) {
+	console.log('🎯 [setSavingsGoal] Setting savings goal:', savingsGoal)
+	return callApi('/savings-goals', {
+		method: 'POST',
+		body: JSON.stringify({ savingsGoal, currentSavings }),
+	}, token)
+}
+export async function updateCurrentSavings(currentSavings, token) {
+	console.log('🎯 [updateCurrentSavings] Updating current savings:', currentSavings)
+	return callApi('/savings-goals/current', {
+		method: 'PUT',
+		body: JSON.stringify({ currentSavings }),
+	}, token)
+}
+
+export async function deleteSavingsGoal(token) {
+	console.log('🎯 [deleteSavingsGoal] Deleting savings goal')
+	return callApi('/savings-goals', {
+		method: 'DELETE',
+	}, token)
+}
+
+export default { getExpenses, createExpense, updateExpense, deleteExpense, getAnalytics, getCategories, sendChatMessage, uploadReceipt, getReceipts, deleteReceipt, getBudgets, createBudget, updateBudget, deleteBudget, getSavingsGoal, setSavingsGoal, updateCurrentSavings, deleteSavingsGoal }

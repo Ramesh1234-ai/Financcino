@@ -8,6 +8,7 @@ import Sidebar from "../common/Sidebar";
 import useAuth from "../../hooks/useAuth";
 import * as api from "../../services/api";
 import { useNavigate } from "react-router-dom";
+import BudgetModal from "./BudgetModal";
 
 // ─── Color palette (matches dashboard's indigo/violet accent tones) ────────────
 const CAT_COLORS = ["#6366f1","#8b5cf6","#a78bfa","#c084fc","#e879f9","#f472b6"];
@@ -135,7 +136,7 @@ export default function AnalyticsPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -156,6 +157,10 @@ export default function AnalyticsPage() {
   const stats = data?.stats || {};
   const totalCategories = data?.categories?.reduce((s, c) => s + c.value, 0) || 1;
   
+  // Determine budget status - show "No budget set" if no budgets exist
+  const totalBudget = stats?.totalBudget || 0;
+  const budgetRemaining = stats?.budgetRemaining || 0;
+  const hasBudget = totalBudget > 0;
   // Build stat cards - removed savingsRate since no income model exists
   const statCards = [
     {
@@ -174,10 +179,13 @@ export default function AnalyticsPage() {
     },
     {
       label: "BUDGET REMAINING",
-      value: `₹${stats?.budgetRemaining?.toLocaleString() ?? "—"}`,
-      sub: "Left this period",
-      badge: stats?.budgetRemaining > 0 ? "green" : "red",
-      badgeText: stats?.budgetRemaining > 0 ? "✓ On track" : "✗ Over budget",
+      value: hasBudget ? `₹${budgetRemaining?.toLocaleString() ?? "—"}` : "—",
+      sub: hasBudget ? "Left this period" : "No budget set",
+      badge: hasBudget ? (budgetRemaining > 0 ? "green" : "red") : "gray",
+      badgeText: hasBudget 
+        ? (budgetRemaining > 0 ? "✓ On track" : "✗ Over budget") 
+        : "Set a budget →",
+      onClick: !hasBudget ? () => setShowBudgetModal(true) : undefined,
     },
     {
       label: "TOP CATEGORY",
@@ -211,17 +219,28 @@ export default function AnalyticsPage() {
             <h1 className="text-[1.45rem] font-bold text-gray-900 tracking-tight mb-1">Analytics</h1>
             <p className="text-sm text-gray-400">Here's your financial overview</p>
           </div>
+          {/* ── Budget button ── */}
+          <div className="mb-6">
+            <button
+              onClick={() => setShowBudgetModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Manage Budgets
+            </button>
+          </div>
 
           {/* ── Error banner ── */}
           {error && (
             <div className="mb-5 flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-red-500 text-sm">
-              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
               </svg>
               {error}
             </div>
           )}
-
           {/* ── Time range toggle ── */}
           <div className="mb-6">
             <div className="inline-flex gap-0.5 bg-[#f0f0f0] border border-gray-200 rounded-xl p-1">
@@ -248,8 +267,9 @@ export default function AnalyticsPage() {
               : statCards.map((s, i) => (
                 <div
                   key={i}
-                  className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm
-                    hover:shadow-md hover:border-gray-300 transition-all duration-200"
+                  onClick={s.onClick}
+                  className={`bg-white border border-gray-200 rounded-2xl p-6 shadow-sm
+                    hover:shadow-md hover:border-gray-300 transition-all duration-200 ${s.onClick ? 'cursor-pointer' : ''}`}
                 >
                   <p className="text-[11px] font-semibold tracking-widest uppercase text-gray-400 mb-2">
                     {s.label}
@@ -346,7 +366,7 @@ export default function AnalyticsPage() {
                     <div key={i} className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
-                          className="w-2 h-2 rounded-sm flex-shrink-0"
+                          className="w-2 h-2 rounded-sm shrink-0"
                           style={{ background: CAT_COLORS[i % CAT_COLORS.length] }}
                         />
                         <span className="text-xs text-gray-600 capitalize">{c.name}</span>
@@ -409,6 +429,13 @@ export default function AnalyticsPage() {
 
         </div>
       </div>
+
+      {/* Budget Modal */}
+      <BudgetModal 
+        isOpen={showBudgetModal} 
+        onClose={() => setShowBudgetModal(false)}
+        onBudgetCreated={() => loadData()}
+      />
     </>
   );
 }

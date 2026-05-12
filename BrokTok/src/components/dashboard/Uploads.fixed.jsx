@@ -86,6 +86,11 @@ function ReceiptGallery() {
             date = new Date().toISOString().split('T')[0];
           }
 
+          // Extract category FIRST (needed for merchant fallback logic)
+          const category = 
+            r.extractedData?.category ||
+            r.extracted_data?.category ||
+            'Other';
           // Extract merchant - try multiple sources
           let merchant = r.extractedData?.merchant;
           if (!merchant && r.extractedData?.text) {
@@ -97,13 +102,25 @@ function ReceiptGallery() {
           if (!merchant && r.extracted_data?.text) {
             merchant = r.extracted_data.text.split('\n')[0];
           }
+          
+          // Clean up merchant name - skip transaction IDs
+          if (merchant) {
+            merchant = String(merchant).trim();
+            // Skip if it looks like a transaction ID
+            if (merchant.match(/^TRANS|^ID|^REF|^TXN|^REFERENCE|^RECEIPT[#\s]?[0-9]/i)) {
+              merchant = null;
+            }
+          }
+          
+          // Generate user-friendly fallback if merchant not found
+          if (!merchant) {
+            const categoryLabel = String(category) !== 'Other' ? category : 'Expense';
+            const dateObj = new Date(String(date));
+            const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+            merchant = `${categoryLabel} Receipt - ${dayOfWeek}`;
+          }
+          
           merchant = merchant || r.fileName || 'Receipt';
-
-          // Extract category
-          const category = 
-            r.extractedData?.category ||
-            r.extracted_data?.category ||
-            'Other';
 
           const normalized = {
             id: receiptId,

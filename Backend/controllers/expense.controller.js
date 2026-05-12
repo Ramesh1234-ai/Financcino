@@ -3,7 +3,7 @@ import { Expense } from '../models/expense.models.js';
 import { AppError } from '../middleware/errorHandler.js';
 import logger from '../utils/logger.js';
 import { config } from '../config/config.js';
-
+import  {checkBudgetThresholds}  from '../src/jobs/budgetAlert.job.js';
 export async function getExpenses(req, res, next) {
   try {
     const { page = 1, limit = config.ITEMS_PER_PAGE, category } = req.query;
@@ -53,6 +53,37 @@ export async function createExpense(req, res, next) {
     });
 
     logger.info(`Expense created: ${expense._id} by user ${req.user.id}`);
+
+    // ==================== TRIGGER BUDGET CHECK ====================
+    // Check if expense triggers budget alerts
+    // This is done asynchronously to not block the response
+    if (process.env.BUDGET_ALERTS_ENABLED !== 'false') {
+      try {
+        checkBudgetThresholds(req.user.id, expense._id)
+          .then((result) => {
+            if (result.alertsTriggered && result.alertsTriggered > 0) {
+              logger.info(`Budget alert(s) triggered for user ${req.user.id}`, {
+                alertCount: result.alertsTriggered,
+                alerts: result.alerts,
+              });
+            }
+          })
+          .catch((error) => {
+            logger.error('Budget check failed (non-blocking)', {
+              userId: req.user.id,
+              expenseId: expense._id,
+              error: error.message,
+            });
+            // Don't fail the request - email alerts are secondary feature
+          });
+      } catch (error) {
+        logger.error('Error initiating budget check', {
+          userId: req.user.id,
+          error: error.message,
+        });
+        // Continue - don't block expense creation
+      }
+    }
 
     res.status(201).json({
       success: true,

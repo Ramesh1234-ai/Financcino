@@ -324,16 +324,52 @@ function parseReceiptBasic(text) {
     if (date) break;
   }
 
-  // Extract merchant - usually first meaningful non-numeric line
+  // Extract merchant - improved logic to find business names
   let merchant = null;
+  
+  // Strategy 1: Look for common business keywords and capture the whole line
+  const businessPatterns = [
+    /^(.*?(?:restaurant|cafe|coffee|hotel|store|shop|mart|market|pharmacy|clinic|salon|garage|service|outlet|mall|center|office|company|pvt|ltd|inc|corp|group|co\.?)\b.*)/i,
+    /^(.*?(?:swiggy|zomato|ubereats|grab|amazon|flipkart|paytm|googlepay|phonepay)\b.*)/i,
+    /^([A-Z][A-Za-z\s&\-\.]+(?:store|shop|restaurant|cafe|hotel|mart))/i
+  ];
+  
   for (const line of lines) {
-    if (line.length > 2 && line.length < 100 && !line.match(/^\d+/) && !line.match(/total|amount|date/i)) {
-      merchant = line
-        .replace(/[^\w\s\-&.]/g, '') // Remove special chars
+    if (line.length > 3 && line.length < 100 && !line.match(/^\d/) && !line.match(/total|amount|date|trans|receipt|invoice|bill|₹|^[A-Z0-9]{8,}$/i)) {
+      for (const pattern of businessPatterns) {
+        const match = line.match(pattern);
+        if (match) {
+          merchant = line
+            .replace(/[^\w\s\-&.]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (merchant && merchant.length > 2 && merchant.length < 80 && !merchant.match(/^TRANS|^ID|^REF|^\d+/i)) {
+            logger.info('✅ [parseReceiptBasic] Found merchant (pattern):', merchant);
+            break;
+          }
+        }
+      }
+      if (merchant) break;
+    }
+  }
+  
+  // Strategy 2: If not found, take any reasonable-length first line that isn't numeric/metadata
+  if (!merchant) {
+    for (const line of lines) {
+      const cleanLine = line
+        .replace(/[^\w\s\-&.]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
-      if (merchant && merchant.length > 2) {
-        logger.info('✅ [parseReceiptBasic] Found merchant:', merchant);
+      
+      if (
+        cleanLine.length > 3 &&
+        cleanLine.length < 80 &&
+        !cleanLine.match(/^\d+$/) &&
+        !cleanLine.match(/^TRANS|^ID|^REF|^TXN|^RECEIPT|^INVOICE/i) &&
+        !cleanLine.match(/total|amount|date|time|thank|welcome|hello/i)
+      ) {
+        merchant = cleanLine;
+        logger.info('✅ [parseReceiptBasic] Found merchant (fallback):', merchant);
         break;
       }
     }

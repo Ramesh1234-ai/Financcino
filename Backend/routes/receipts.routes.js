@@ -2,9 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import * as receiptsController from '../controllers/receipts.controller.js';
 import { requireAuth } from '../middleware/auth.js';
-
 const router = express.Router();
-
 // Configure multer for file uploads
 const storage = multer.memoryStorage(); // Store files in memory (can be changed to disk)
 const upload = multer({
@@ -21,22 +19,18 @@ const upload = multer({
 		}
 	}
 });
-
 // All receipt routes require authentication
 router.use(requireAuth);
-
 /**
  * POST /api/receipts/upload
  * Upload a receipt image and process with OCR
  */
 router.post('/upload', upload.single('receipt'), receiptsController.uploadReceipt);
-
 /**
  * GET /api/receipts
  * Get all receipts for the authenticated user
  */
 router.get('/', receiptsController.getReceipts);
-
 /**
  * GET /api/receipts/:id
  * Get a specific receipt by ID
@@ -48,11 +42,9 @@ router.get('/:id', receiptsController.getReceiptById);
  * Delete a receipt
  */
 router.delete('/:id', receiptsController.deleteReceipt);
-
 /**
  * POST /api/receipts/:id/expense
  * Create an expense from a receipt
  */
 router.post('/:id/expense', receiptsController.createExpenseFromReceipt);
-
 export default router;

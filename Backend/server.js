@@ -1,6 +1,8 @@
+// Load environment variables FIRST before any other imports
+import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
@@ -12,31 +14,29 @@ import swaggerSpec from './config/swagger.js';
 import authRoutes from './routes/auth.routes.js';
 import expenseRoutes from './routes/expenses.routes.js';
 import budgetRoutes from './routes/budgets.routes.js';
+import savingsGoalsRoutes from './routes/savingsGoals.routes.js';
 import categoryRoutes from './routes/categories.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import chatbotRoutes from './routes/chatbot.routes.js';
 import receiptsRoutes from './routes/receipts.routes.js';
 import publicRoutes from './routes/public.routes.js';
 import webhookRoutes from './routes/webhooks.routes.js';
-// Load environment variables
-dotenv.config();
+import  {initWeeklyDigestJob}  from './src/jobs/weeklyDigest.job.js';
 const app = express();
 const PORT = config.PORT;
 const MONGODB_URI = config.MONGODB_URI;
 const NODE_ENV = config.NODE_ENV;
 const JWT_SECRET=config.JWT_SECRET;
 // ==================== MIDDLEWARE ====================
-
 // Security middleware
 app.use(helmet()); // Set secure HTTP headers
 // CORS middleware - Support multiple origins in development
 const corsOptions = {
-  origin: config.CORS_ORIGIN?.split(',') || "https://finan-cino.vercel.app",
+  origin: config.CORS_ORIGIN?.split(',') || "https://finan-cino.vercel.app/",
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
-
 app.use(cors(corsOptions));
 // Body parsing middleware
 // For webhooks: capture raw body before JSON parsing for signature verification
@@ -46,7 +46,6 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 // Logging middleware
 app.use(requestLogger);
-
 // ==================== SWAGGER SETUP ====================
 // Serve Swagger UI at /api-docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -54,13 +53,11 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
     url: '/api-docs.json',
   },
 }));
-
 // Serve swagger spec as JSON
 app.get('/api-docs.json', (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
-
 // ==================== DATABASE CONNECTION ====================
 async function connectDB() {
   try {
@@ -71,25 +68,20 @@ async function connectDB() {
       maxPoolSize: 10,
       minPoolSize: 2,
     });
-
     logger.info(`MongoDB connected: ${conn.connection.host}`);
-
     // Monitor connection events
     mongoose.connection.on('disconnected', () => {
       logger.warn('MongoDB disconnected');
     });
-
     mongoose.connection.on('error', (err) => {
       logger.error('MongoDB error:', err);
     });
-
     return conn;
   } catch (err) {
     logger.error('Database connection failed:', err);
     process.exit(1);
   }
 }
-
 // ==================== ROUTES ====================
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -105,6 +97,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/budgets', budgetRoutes);
+app.use('/api/savings-goals', savingsGoalsRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/chat', chatbotRoutes);
@@ -131,6 +124,18 @@ async function startServer() {
   try {
     // Connect to MongoDB first
     await connectDB();
+
+    // ==================== INITIALIZE SCHEDULED JOBS ====================
+    // Weekly digest cron job (runs every Sunday at 09:00 UTC)
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        initWeeklyDigestJob();
+        logger.info('✅ Scheduled jobs initialized');
+      } catch (error) {
+        logger.error('Failed to initialize scheduled jobs', { error: error.message });
+        // Don't fail server startup - scheduled jobs are secondary
+      }
+    }
     // Start listening
     const server = app.listen(PORT, () => {
       logger.info(`

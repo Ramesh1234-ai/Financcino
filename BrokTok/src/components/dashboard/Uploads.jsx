@@ -92,13 +92,31 @@ function ReceiptGallery() {
           if (!merchant && r.extracted_data?.text) {
             merchant = r.extracted_data.text.split('\n')[0];
           }
-          merchant = merchant || r.fileName || 'Receipt';
-
+          
+          // Clean up merchant name - skip transaction IDs
+          if (merchant) {
+            merchant = String(merchant).trim();
+            // Skip if it looks like a transaction ID
+            if (merchant.match(/^TRANS|^ID|^REF|^TXN|^REFERENCE|^RECEIPT[#\s]?[0-9]/i)) {
+              merchant = null;
+            }
+          }
+          
           // Extract category
           const category = 
             r.extractedData?.category ||
             r.extracted_data?.category ||
             'Other';
+          
+          // Generate user-friendly fallback if merchant not found
+          if (!merchant) {
+            const categoryLabel = String(category) !== 'Other' ? category : 'Expense';
+            const dateObj = new Date(String(date));
+            const dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+            merchant = `${categoryLabel} Receipt - ${dayOfWeek}`;
+          }
+          
+          merchant = merchant || 'Receipt';
 
           const normalized = {
             id: receiptId,
